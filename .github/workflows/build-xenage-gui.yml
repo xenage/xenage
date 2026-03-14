@@ -1,0 +1,70 @@
+name: Build Xenage GUI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+          cache-dependency-path: apps/xenage-gui/yarn.lock
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          # For Tauri 2.0 (webkit2gtk-4.1)
+          sudo apt-get install -y libwebkit2gtk-4.1-dev
+
+      - name: install frontend dependencies
+        run: yarn install
+        working-directory: apps/xenage-gui
+
+      - name: build frontend and tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          projectPath: apps/xenage-gui
+          tagName: ${{ github.ref == 'refs/heads/dev' && 'xenage-gui-dev' || 'xenage-gui-v__VERSION__' }}
+          releaseName: ${{ github.ref == 'refs/heads/dev' && 'Xenage GUI Development' || 'Xenage GUI v__VERSION__' }}
+          releaseBody: "Automated release from GitHub Actions"
+          releaseDraft: true
+          prerelease: ${{ github.ref == 'refs/heads/dev' }}
+          args: ""
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref == 'refs/heads/dev' && format('xenage-gui-dev-{0}', matrix.platform) || format('xenage-gui-{0}', matrix.platform) }}
+          path: |
+            apps/xenage-gui/src-tauri/target/release/bundle/msi/*.msi
+            apps/xenage-gui/src-tauri/target/release/bundle/setup.exe
+            apps/xenage-gui/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/xenage-gui/src-tauri/target/release/bundle/deb/*.deb
+            apps/xenage-gui/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/xenage-gui/src-tauri/target/release/*.sig
