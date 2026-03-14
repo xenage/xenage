@@ -1,0 +1,63 @@
+services:
+  leader:
+    image: xenage:local
+    command:
+      - sh
+      - -lc
+      - >
+        xenage-control-plane --node-id cp-a --data-dir /data/leader --endpoint http://leader:8734 init --group-id demo &&
+        python -c "import json, pathlib; data=json.loads(pathlib.Path('/data/leader/group_state.json').read_text()); print(data['leader_pubkey'])" > /shared/leader.pubkey &&
+        xenage-control-plane --node-id cp-a --data-dir /data/leader --endpoint http://leader:8734 serve --host 0.0.0.0 --port 8734 --bootstrap-out /shared/cp.token --bootstrap-out /shared/rt.token --bootstrap-ttl-seconds 300
+    volumes:
+      - leader-data:/data/leader
+      - shared-artifacts:/shared
+    ports:
+      - "8734:8734"
+
+  follower:
+    image: xenage:local
+    depends_on:
+      - leader
+    command:
+      - sh
+      - -lc
+      - >
+        until [ -f /shared/cp.token ]; do sleep 1; done;
+        xenage-control-plane --node-id cp-b --data-dir /data/follower --endpoint http://follower:8734 connect --leader-host http://leader:8734 --leader-pubkey $(cat /shared/leader.pubkey) --bootstrap-token $(cat /shared/cp.token) &&
+        xenage-control-plane --node-id cp-b --data-dir /data/follower --endpoint http://follower:8734 serve --host 0.0.0.0 --port 8734
+    volumes:
+      - follower-data:/data/follower
+      - shared-artifacts:/shared
+
+  runtime:
+    image: xenage:local
+    depends_on:
+      - leader
+    command:
+      - sh
+      - -lc
+      - >
+        until [ -f /shared/rt.token ]; do sleep 1; done;
+        xenage-runtime --node-id rt-a --data-dir /data/runtime connect --leader-host http://leader:8734 --leader-pubkey $(cat /shared/leader.pubkey) --bootstrap-token $(cat /shared/rt.token) &&
+        xenage-runtime --node-id rt-a --data-dir /data/runtime serve
+    volumes:
+      - runtime-data:/data/runtime
+      - shared-artifacts:/shared
+
+  integration-checks:
+    image: xenage:local
+    depends_on:
+      - leader
+      - follower
+      - runtime
+    command: ["python", "/app/tests/integration/compose_checks.py"]
+    volumes:
+      - leader-data:/data/leader:ro
+      - follower-data:/data/follower:ro
+      - runtime-data:/data/runtime:ro
+
+volumes:
+  leader-data:
+  follower-data:
+  runtime-data:
+  shared-artifacts:

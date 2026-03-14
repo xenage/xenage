@@ -14,7 +14,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - platform: macos-latest
+            os: macos
+            arch: x86_64
+          - platform: macos-14
+            os: macos
+            arch: aarch64
+          - platform: ubuntu-22.04
+            os: linux
+            arch: x86_64
+          - platform: ubuntu-24.04-arm
+            os: linux
+            arch: aarch64
+          - platform: windows-latest
+            os: windows
+            arch: x86_64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -32,8 +47,8 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: install dependencies (linux only)
+        if: matrix.os == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
@@ -104,7 +119,7 @@ jobs:
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.ref == 'refs/heads/dev' && format('xenage-gui-dev-{0}', matrix.platform) || format('xenage-gui-{0}', matrix.platform) }}
+          name: ${{ github.ref == 'refs/heads/dev' && format('xenage-gui-dev-{0}-{1}', matrix.os, matrix.arch) || format('xenage-gui-{0}-{1}', matrix.os, matrix.arch) }}
           path: |
             apps/xenage-gui/src-tauri/target/release/bundle/msi/*.msi
             apps/xenage-gui/src-tauri/target/release/bundle/setup.exe

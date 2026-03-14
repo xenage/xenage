@@ -1,0 +1,18 @@
+log_level = "INFO"
+
+[network]
+control_plane_host = "0.0.0.0"
+control_plane_port = 8737
+runtime_host = "0.0.0.0"
+runtime_port = 8735
+
+[control_plane]
+init_ttl_seconds = 12
+bootstrap_ttl_seconds = 180
+state_ttl_seconds = 12
+failover_check_interval_seconds = 1
+failover_escalation_seconds = 15
+auto_failover = true
+
+[runtime]
+join_retry_interval_seconds = 1

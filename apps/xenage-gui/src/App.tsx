@@ -5,21 +5,61 @@ import type { OverlayScrollbarsComponentRef } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 import manifest from "./generated/control-plane-release.json";
 import "./App.css";
+import { ClusterConnectionService } from "./services/clusterConnection";
+import type { StoredClusterConnection, StoredClusterUiPrefs } from "./services/clusterConnection";
 import { getLogLevel, logger, setLogLevel } from "./services/logger";
+import { StandaloneService } from "./services/standalone";
 import { UpdateService } from "./services/update";
 import type { LogLevel } from "./services/logger";
+import type { StandaloneStatus } from "./services/standalone";
 import type { UpdateChannel, UpdateLogEvent } from "./services/update";
 import type { PartialOptions } from "overlayscrollbars";
 import type {
   ControlPlaneManifest,
-  ManifestField,
-  ManifestResource,
   NavigationLeaf,
 } from "./types/controlPlane";
+import type { GuiClusterSnapshot } from "./types/guiConnection";
 
 const controlPlane = manifest as ControlPlaneManifest;
+const SETUP_TAB_ID = "app:setup-guide";
+const SETUP_KIND = "SetupGuide";
 const SETTINGS_TAB_ID = "app:settings";
 const SETTINGS_KIND = "Settings";
+const DEFAULT_CONTROL_PLANE_ARGS = `--node-id
+cp-local
+--data-dir
+/tmp/xenage/cp-local
+--endpoint
+http://127.0.0.1:8734
+serve
+--host
+127.0.0.1
+--port
+8734`;
+const DEFAULT_RUNTIME_ARGS = `--node-id
+rt-local
+--data-dir
+/tmp/xenage/rt-local
+--endpoint
+http://127.0.0.1:8735
+serve
+--host
+127.0.0.1
+--port
+8735`;
+const DEFAULT_GUI_CONNECTION_YAML = `apiVersion: xenage.io/v1alpha1
+kind: ClusterConnection
+metadata:
+  name: demo-admin
+spec:
+  clusterName: demo
+  controlPlaneUrls:
+    - http://127.0.0.1:8734
+  user:
+    id: admin
+    role: admin
+    publicKey: REPLACE_WITH_GENERATED_PUBLIC_KEY
+    privateKey: REPLACE_WITH_GENERATED_PRIVATE_KEY`;
 
 type ClusterEntry = {
   id: string;
@@ -34,67 +74,54 @@ type OpenTab = {
   clusterId: string;
 };
 
-const clusters: ClusterEntry[] = [
-  { id: "main-current", name: "MAIN_CURRENT", status: "connected", accent: "#22c55e" },
-  { id: "remote-test", name: "REMOTE_TEST", status: "warning", accent: "#f59e0b" },
-];
-
-function formatLabel(value: string) {
-  return value.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-}
-
-function prettyValue(value: unknown): string {
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
-  }
-
-  if (Array.isArray(value)) {
-    return value.length === 0 ? "[]" : value.join(", ");
-  }
-
-  if (value && typeof value === "object") {
-    return JSON.stringify(value, null, 2);
-  }
-
-  return String(value);
-}
-
-function getHighlights(resource: ManifestResource) {
-  return Object.entries(resource.sample.status ?? {})
-    .slice(0, 4)
-    .map(([label, value]) => ({ label: formatLabel(label), value: prettyValue(value) }));
-}
-
-function getSectionPreview(
-  resource: ManifestResource,
-  section: "metadata" | "spec" | "status",
-  fields: ManifestField[],
-) {
-  const data = resource.sample[section] ?? {};
-
-  return fields.slice(0, 4).map((field) => ({
-    name: field.name,
-    type: `${field.type}${field.isArray ? "[]" : ""}`,
-    value: field.name in data ? prettyValue(data[field.name]) : "n/a",
-  }));
-}
+type ClusterUiPrefs = {
+  name: string;
+  accent: string;
+};
 
 function App() {
   const tabStripRef = useRef<OverlayScrollbarsComponentRef<"div"> | null>(null);
+  const sidebarResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [search, setSearch] = useState("");
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [managingStandalone, setManagingStandalone] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [standaloneStatusMessage, setStandaloneStatusMessage] = useState<string | null>(null);
   const [channel, setChannel] = useState<UpdateChannel>(UpdateService.getChannel());
+  const [standaloneStatus, setStandaloneStatus] = useState<StandaloneStatus | null>(null);
+  const [controlPlaneArgs, setControlPlaneArgs] = useState(DEFAULT_CONTROL_PLANE_ARGS);
+  const [runtimeArgs, setRuntimeArgs] = useState(DEFAULT_RUNTIME_ARGS);
   const [logLevel, setAppLogLevel] = useState<LogLevel>(getLogLevel());
-  const [activeClusterId, setActiveClusterId] = useState(clusters[0].id);
-  const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({
-    "main-current": true,
-    "remote-test": false,
-  });
+  const [guiConnectionYaml, setGuiConnectionYaml] = useState(DEFAULT_GUI_CONNECTION_YAML);
+  const [clusterSnapshots, setClusterSnapshots] = useState<Record<string, GuiClusterSnapshot>>({});
+  const [clusterSnapshotErrors, setClusterSnapshotErrors] = useState<Record<string, string>>({});
+  const [clusterSnapshotLoading, setClusterSnapshotLoading] = useState<Record<string, boolean>>({});
+  const [guiConnectionStatus, setGuiConnectionStatus] = useState<string | null>(null);
+  const [connectingGui, setConnectingGui] = useState(false);
+  const [connectionConfigs, setConnectionConfigs] = useState<StoredClusterConnection[]>([]);
+  const [clusterUiPrefs, setClusterUiPrefs] = useState<Record<string, ClusterUiPrefs>>({});
+  const [activeClusterId, setActiveClusterId] = useState("");
+  const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({});
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([
-    { id: "main-current:Cluster", kind: "Cluster", clusterId: "main-current" },
+    { id: SETUP_TAB_ID, kind: SETUP_KIND, clusterId: "" },
   ]);
-  const [activeTabId, setActiveTabId] = useState<string>("main-current:Cluster");
+  const [activeTabId, setActiveTabId] = useState<string>(SETUP_TAB_ID);
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(286);
+  const [editingClusterId, setEditingClusterId] = useState<string | null>(null);
+  const [clusterDraftName, setClusterDraftName] = useState("");
+  const [clusterDraftAccent, setClusterDraftAccent] = useState("#22c55e");
+  const clusters = useMemo(
+    () =>
+      connectionConfigs.map((item) => ({
+        id: item.id,
+        name: clusterUiPrefs[item.id]?.name || item.name,
+        status: "connected" as const,
+        accent: clusterUiPrefs[item.id]?.accent || "#22c55e",
+      })),
+    [clusterUiPrefs, connectionConfigs],
+  );
 
   const resourcesByKind = useMemo(
     () => new Map(controlPlane.resources.map((resource) => [resource.kind, resource])),
@@ -107,7 +134,7 @@ function App() {
         acc[cluster.id] = controlPlane.navigation.children;
         return acc;
       }, {}),
-    [],
+    [clusters],
   );
 
   const visibleClusters = useMemo(() => {
@@ -120,14 +147,21 @@ function App() {
   }, [itemsByCluster, search]);
 
   const activeTab = openTabs.find((tab) => tab.id === activeTabId) ?? openTabs[0];
+  const setupTabActive = activeTab?.id === SETUP_TAB_ID;
   const settingsTabActive = activeTab?.id === SETTINGS_TAB_ID;
-  const activeKind = activeTab?.kind ?? "Cluster";
-  const resolvedClusterId = activeTab?.clusterId ?? activeClusterId;
-  const activeResource = settingsTabActive
+  const activeKind = activeTab?.kind ?? "Node";
+  const resolvedClusterId = activeTab?.clusterId || activeClusterId || clusters[0]?.id || "";
+  const activeResource = settingsTabActive || setupTabActive
     ? null
     : resourcesByKind.get(activeKind) ?? controlPlane.resources[0];
-  const activeCluster = clusters.find((cluster) => cluster.id === resolvedClusterId) ?? clusters[0];
-  const highlights = activeResource ? getHighlights(activeResource) : [];
+  const apiTableKinds = useMemo(() => new Set(["Node", "GroupConfig", "Event"]), []);
+  const activeKindIsApiTable = apiTableKinds.has(activeKind);
+  const hasStoredConnections = clusters.length > 0;
+  const showSidebar = hasStoredConnections && sidebarVisible;
+  const activeSnapshot = clusterSnapshots[resolvedClusterId];
+  const activeSnapshotError = clusterSnapshotErrors[resolvedClusterId] ?? null;
+  const activeSnapshotLoading = clusterSnapshotLoading[resolvedClusterId] ?? false;
+  const useLiveTable = Boolean(activeSnapshot && activeKindIsApiTable);
   const overlayScrollbarOptions = useMemo<PartialOptions>(
     () => ({
       scrollbars: {
@@ -179,20 +213,21 @@ function App() {
     activateTab(tabId, clusterId);
   }, [activateTab]);
 
-  const openSettingsTab = useCallback(() => {
-    logger.info("Opening settings tab");
+  const openSetupTab = useCallback(() => {
+    const clusterId = activeClusterId || clusters[0]?.id || "";
+    const clusterConfig = connectionConfigs.find((item) => item.id === clusterId) ?? connectionConfigs[0];
+    if (clusterConfig?.yaml) {
+      setGuiConnectionYaml(clusterConfig.yaml);
+    }
+    logger.info("Opening setup guide tab");
     setOpenTabs((current) => {
-      if (current.some((tab) => tab.id === SETTINGS_TAB_ID)) {
-        logger.debug("Settings tab already open");
+      if (current.some((tab) => tab.id === SETUP_TAB_ID)) {
         return current;
       }
-
-      const next = [...current, { id: SETTINGS_TAB_ID, kind: SETTINGS_KIND, clusterId: clusters[0].id }];
-      logger.debug("Settings tab appended", { openTabCount: next.length });
-      return next;
+      return [...current, { id: SETUP_TAB_ID, kind: SETUP_KIND, clusterId }];
     });
-    activateTab(SETTINGS_TAB_ID, clusters[0].id);
-  }, [activateTab]);
+    activateTab(SETUP_TAB_ID, clusterId);
+  }, [activateTab, activeClusterId, clusters, connectionConfigs]);
 
   const closeTab = useCallback((tabId: string) => {
     let nextActiveTabId: string | null = null;
@@ -226,13 +261,99 @@ function App() {
     });
   }, []);
 
+  const moveTab = useCallback((sourceId: string, targetId: string) => {
+    if (!sourceId || !targetId || sourceId === targetId) {
+      return;
+    }
+
+    setOpenTabs((current) => {
+      const sourceIndex = current.findIndex((tab) => tab.id === sourceId);
+      const targetIndex = current.findIndex((tab) => tab.id === targetId);
+      if (sourceIndex === -1 || targetIndex === -1) {
+        return current;
+      }
+
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const fetchSnapshotForCluster = useCallback(async (clusterId: string) => {
+    if (!clusterId) {
+      return;
+    }
+    const connection = connectionConfigs.find((item) => item.id === clusterId);
+    if (!connection) {
+      return;
+    }
+
+    setClusterSnapshotLoading((current) => ({ ...current, [clusterId]: true }));
+    setClusterSnapshotErrors((current) => ({ ...current, [clusterId]: "" }));
+    try {
+      const snapshot = await ClusterConnectionService.fetchSnapshotFromYaml(connection.yaml);
+      setClusterSnapshots((current) => ({ ...current, [clusterId]: snapshot }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fetch cluster snapshot.";
+      setClusterSnapshotErrors((current) => ({ ...current, [clusterId]: message }));
+      logger.error("Failed to fetch cluster snapshot", { clusterId, error });
+    } finally {
+      setClusterSnapshotLoading((current) => ({ ...current, [clusterId]: false }));
+    }
+  }, [connectionConfigs]);
+
+  const loadConnections = useCallback(async () => {
+    try {
+      const [saved, prefs] = await Promise.all([
+        ClusterConnectionService.listConnectionYamls(),
+        ClusterConnectionService.listClusterUiPrefs(),
+      ]);
+      setConnectionConfigs(saved);
+      setClusterUiPrefs(
+        prefs.reduce<Record<string, ClusterUiPrefs>>((acc, item: StoredClusterUiPrefs) => {
+          acc[item.connection_id] = {
+            name: item.name,
+            accent: item.accent,
+          };
+          return acc;
+        }, {}),
+      );
+      if (saved.length > 0) {
+        setActiveClusterId((current) => current || saved[0].id);
+        setExpandedClusters((current) => {
+          if (Object.keys(current).length > 0) {
+            return current;
+          }
+          return saved.reduce<Record<string, boolean>>((acc, item, index) => {
+            acc[item.id] = index === 0;
+            return acc;
+          }, {});
+        });
+        setGuiConnectionYaml((current) => (current === DEFAULT_GUI_CONNECTION_YAML ? saved[0].yaml : current));
+      }
+    } catch (error) {
+      logger.error("Failed to load saved cluster configs", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
+
   useEffect(() => {
     logger.info("App mounted", {
       clusterCount: clusters.length,
       resourceCount: controlPlane.resources.length,
       logLevel,
     });
-  }, [logLevel]);
+  }, [clusters.length, logLevel]);
+
+  useEffect(() => {
+    if (!hasStoredConnections && activeTabId !== SETUP_TAB_ID && activeTabId !== SETTINGS_TAB_ID) {
+      setActiveTabId(SETUP_TAB_ID);
+    }
+  }, [activeTabId, hasStoredConnections]);
 
   useEffect(() => {
     logger.debug("Navigation search changed", { search });
@@ -241,6 +362,22 @@ function App() {
   useEffect(() => {
     logger.debug("Active tab changed", { activeTabId });
   }, [activeTabId]);
+
+  useEffect(() => {
+    if (!activeKindIsApiTable || !resolvedClusterId) {
+      return;
+    }
+    if (clusterSnapshots[resolvedClusterId] || clusterSnapshotLoading[resolvedClusterId]) {
+      return;
+    }
+    void fetchSnapshotForCluster(resolvedClusterId);
+  }, [
+    activeKindIsApiTable,
+    clusterSnapshotLoading,
+    clusterSnapshots,
+    fetchSnapshotForCluster,
+    resolvedClusterId,
+  ]);
 
   useEffect(() => {
     const hostElement = tabStripRef.current?.getElement();
@@ -289,6 +426,26 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    let unlisten: (() => void) | undefined;
+
+    logger.debug("Subscribing to standalone logs");
+    void StandaloneService.subscribeToLogs((event) => {
+      if (mounted) {
+        setStandaloneStatusMessage(event.message);
+      }
+    }).then((dispose) => {
+      unlisten = dispose;
+    });
+
+    return () => {
+      mounted = false;
+      logger.debug("Unsubscribing from standalone logs");
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "q" && openTabs.length > 1) {
         event.preventDefault();
@@ -300,6 +457,29 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTabId, closeTab, openTabs.length]);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      const activeResize = sidebarResizeRef.current;
+      if (!activeResize) {
+        return;
+      }
+      const nextWidth = Math.max(220, Math.min(520, activeResize.startWidth + event.clientX - activeResize.startX));
+      setSidebarWidth(nextWidth);
+    };
+
+    const onUp = () => {
+      sidebarResizeRef.current = null;
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const handleTabWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     const element = tabStripRef.current?.osInstance()?.elements().scrollOffsetElement;
@@ -368,17 +548,221 @@ function App() {
     }
   };
 
+  const parseArgsList = (raw: string): string[] =>
+    raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+  const refreshStandaloneStatus = useCallback(async () => {
+    try {
+      const status = await StandaloneService.status();
+      setStandaloneStatus(status);
+      return status;
+    } catch (error) {
+      logger.error("Failed to fetch standalone status", error);
+      setStandaloneStatusMessage("Failed to fetch standalone status.");
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshStandaloneStatus();
+  }, [refreshStandaloneStatus]);
+
+  const handleInstallStandaloneBundle = async () => {
+    setManagingStandalone(true);
+    setStandaloneStatusMessage("Downloading standalone package...");
+    try {
+      const result = await StandaloneService.installBundle(channel);
+      setStandaloneStatusMessage(`Installed standalone ${result.version} to ${result.install_dir}`);
+      await refreshStandaloneStatus();
+    } catch (error) {
+      logger.error("Failed to install standalone package", error);
+      setStandaloneStatusMessage("Standalone package installation failed.");
+    } finally {
+      setManagingStandalone(false);
+    }
+  };
+
+  const handleInstallStandaloneServices = async () => {
+    setManagingStandalone(true);
+    setStandaloneStatusMessage("Installing node services...");
+    try {
+      const cpArgs = parseArgsList(controlPlaneArgs);
+      const rtArgs = parseArgsList(runtimeArgs);
+      await StandaloneService.installNodeService("control-plane", cpArgs);
+      await StandaloneService.installNodeService("runtime", rtArgs);
+      setStandaloneStatusMessage("Node services installed.");
+      await refreshStandaloneStatus();
+    } catch (error) {
+      logger.error("Failed to install standalone services", error);
+      setStandaloneStatusMessage("Service installation failed. Check arguments and permissions.");
+    } finally {
+      setManagingStandalone(false);
+    }
+  };
+
+  const handleStartStandaloneServices = async () => {
+    setManagingStandalone(true);
+    setStandaloneStatusMessage("Starting node services...");
+    try {
+      await StandaloneService.startNodeService("control-plane");
+      await StandaloneService.startNodeService("runtime");
+      setStandaloneStatusMessage("Node services started.");
+      await refreshStandaloneStatus();
+    } catch (error) {
+      logger.error("Failed to start standalone services", error);
+      setStandaloneStatusMessage("Failed to start services. Check service privileges.");
+    } finally {
+      setManagingStandalone(false);
+    }
+  };
+
+  const handleStopStandaloneServices = async () => {
+    setManagingStandalone(true);
+    setStandaloneStatusMessage("Stopping node services...");
+    try {
+      await StandaloneService.stopNodeService("control-plane");
+      await StandaloneService.stopNodeService("runtime");
+      setStandaloneStatusMessage("Node services stopped.");
+      await refreshStandaloneStatus();
+    } catch (error) {
+      logger.error("Failed to stop standalone services", error);
+      setStandaloneStatusMessage("Failed to stop services.");
+    } finally {
+      setManagingStandalone(false);
+    }
+  };
+
+  const handleConnectGui = async () => {
+    setConnectingGui(true);
+    setGuiConnectionStatus("Connecting to control-plane...");
+    try {
+      const snapshot = await ClusterConnectionService.fetchSnapshotFromYaml(guiConnectionYaml);
+      const saved = await ClusterConnectionService.saveConnectionYaml(guiConnectionYaml);
+      const allSaved = await ClusterConnectionService.listConnectionYamls();
+      setConnectionConfigs(allSaved);
+      setActiveClusterId(saved.id);
+      setExpandedClusters((current) => ({ ...current, [saved.id]: true }));
+      setClusterSnapshots((current) => ({ ...current, [saved.id]: snapshot }));
+      setClusterSnapshotErrors((current) => ({ ...current, [saved.id]: "" }));
+      setGuiConnectionStatus(
+        `Connected to ${snapshot.group_id} (state ${snapshot.state_version}, epoch ${snapshot.leader_epoch}).`,
+      );
+    } catch (error) {
+      logger.error("Failed to connect GUI to cluster", error);
+      setGuiConnectionStatus(
+        error instanceof Error ? error.message : "Failed to connect using provided YAML config.",
+      );
+    } finally {
+      setConnectingGui(false);
+    }
+  };
+
+  const openClusterConfigEditor = useCallback((clusterId: string) => {
+    const connection = connectionConfigs.find((item) => item.id === clusterId);
+    if (!connection) {
+      return;
+    }
+    const prefs = clusterUiPrefs[clusterId];
+    setClusterDraftName(prefs?.name || connection.name);
+    setClusterDraftAccent(prefs?.accent || "#22c55e");
+    setEditingClusterId(clusterId);
+  }, [clusterUiPrefs, connectionConfigs]);
+
+  const saveClusterConfigEditor = useCallback(async () => {
+    if (!editingClusterId) {
+      return;
+    }
+    try {
+      const saved = await ClusterConnectionService.saveClusterUiPrefsEntry(
+        editingClusterId,
+        clusterDraftName,
+        clusterDraftAccent,
+      );
+      setClusterUiPrefs((current) => ({
+        ...current,
+        [saved.connection_id]: {
+          name: saved.name,
+          accent: saved.accent,
+        },
+      }));
+      setEditingClusterId(null);
+    } catch (error) {
+      logger.error("Failed to save cluster UI prefs", error);
+    }
+  }, [clusterDraftAccent, clusterDraftName, editingClusterId]);
+
+  const deleteClusterFromEditor = useCallback(async () => {
+    if (!editingClusterId) {
+      return;
+    }
+    try {
+      await ClusterConnectionService.deleteClusterConnection(editingClusterId);
+      let deletedActiveTab = false;
+      setOpenTabs((current) => {
+        deletedActiveTab = current.some((tab) => tab.id === activeTabId && tab.clusterId === editingClusterId);
+        const filtered = current.filter((tab) => tab.clusterId !== editingClusterId);
+        return filtered.length > 0 ? filtered : [{ id: SETUP_TAB_ID, kind: SETUP_KIND, clusterId: "" }];
+      });
+      if (deletedActiveTab) {
+        setActiveTabId(SETUP_TAB_ID);
+      }
+      setClusterSnapshots((current) => {
+        const next = { ...current };
+        delete next[editingClusterId];
+        return next;
+      });
+      setClusterSnapshotErrors((current) => {
+        const next = { ...current };
+        delete next[editingClusterId];
+        return next;
+      });
+      setClusterUiPrefs((current) => {
+        const next = { ...current };
+        delete next[editingClusterId];
+        return next;
+      });
+      setEditingClusterId(null);
+      await loadConnections();
+    } catch (error) {
+      logger.error("Failed to delete cluster connection", error);
+    }
+  }, [activeTabId, editingClusterId, loadConnections]);
+
+  const shareClusterConfigFromEditor = useCallback(async () => {
+    if (!editingClusterId) {
+      return;
+    }
+    const config = connectionConfigs.find((item) => item.id === editingClusterId);
+    if (!config) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(config.yaml);
+      setGuiConnectionStatus(`Cluster config copied to clipboard (${config.name}).`);
+    } catch (error) {
+      logger.error("Failed to copy cluster yaml to clipboard", error);
+      setGuiConnectionStatus("Failed to copy cluster config to clipboard.");
+    }
+  }, [connectionConfigs, editingClusterId]);
+
   return (
-    <main className="ide-shell">
+    <main
+      className={`ide-shell ${showSidebar ? "" : "ide-shell--no-sidebar"}`}
+      style={{ ["--sidebar-width" as string]: `${sidebarWidth}px` }}
+    >
+      {showSidebar ? (
       <aside className="navigator">
         <div className="navigator__header">
           <button
             className="navigator__settings"
-            onClick={openSettingsTab}
+            onClick={() => setSidebarVisible(false)}
             type="button"
-            title="Open settings tab"
+            title="Hide sidebar"
           >
-            <Icon name="settings" />
+            <Icon name="close" />
           </button>
           <div className="navigator__title">xenage</div>
         </div>
@@ -395,7 +779,7 @@ function App() {
               value={search}
             />
           </label>
-          <button className="icon-button" type="button" title="Add cluster">
+          <button className="icon-button" onClick={openSetupTab} type="button" title="Open setup guide">
             <Icon name="plus" />
           </button>
         </div>
@@ -418,6 +802,7 @@ function App() {
                   })}
                   key={cluster.id}
                   onOpen={openResource}
+                  onEditCluster={openClusterConfigEditor}
                   onSelectCluster={(clusterId) => {
                     logger.debug("Selecting cluster", { clusterId });
                     setActiveClusterId(clusterId);
@@ -431,10 +816,66 @@ function App() {
             </div>
           </OverlayScrollbarsComponent>
         </div>
+        {editingClusterId ? (
+          <div className="cluster-editor">
+            <div className="cluster-editor__header">
+              <div className="cluster-editor__title">Cluster Config</div>
+              <button
+                className="cluster-editor__icon"
+                onClick={() => void shareClusterConfigFromEditor()}
+                title="Share config (copy YAML)"
+                type="button"
+              >
+                <Icon name="api" />
+              </button>
+            </div>
+            <label className="cluster-editor__field">
+              <span>Name</span>
+              <input
+                onChange={(event) => setClusterDraftName(event.target.value)}
+                value={clusterDraftName}
+              />
+            </label>
+            <label className="cluster-editor__field">
+              <span>Color</span>
+              <input
+                onChange={(event) => setClusterDraftAccent(event.target.value)}
+                type="color"
+                value={clusterDraftAccent}
+              />
+            </label>
+            <div className="cluster-editor__actions">
+              <button className="cluster-editor__button" onClick={() => void saveClusterConfigEditor()} type="button">Save</button>
+              <button className="cluster-editor__button cluster-editor__button--danger" onClick={() => void deleteClusterFromEditor()} type="button">Delete</button>
+              <button className="cluster-editor__button cluster-editor__button--muted" onClick={() => setEditingClusterId(null)} type="button">Cancel</button>
+            </div>
+          </div>
+        ) : null}
+        <div
+          className="navigator__resize-handle"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            sidebarResizeRef.current = { startX: event.clientX, startWidth: sidebarWidth };
+            document.body.style.userSelect = "none";
+          }}
+          role="separator"
+          aria-label="Resize sidebar"
+        />
       </aside>
+      ) : null}
 
       <section className="workspace">
         <header className="workspace__bar">
+          {!showSidebar && hasStoredConnections ? (
+            <button
+              className="workspace__sidebar-toggle"
+              onClick={() => setSidebarVisible(true)}
+              title="Show sidebar"
+              type="button"
+            >
+              <Icon name="panel" />
+            </button>
+          ) : null}
           <div className="tab-bar">
             <OverlayScrollbarsComponent
               className="tab-strip scroll-host scroll-host--tabs"
@@ -442,21 +883,73 @@ function App() {
               options={tabScrollbarOptions}
               ref={tabStripRef}
             >
-              <div className="tab-strip__inner">
+              <div
+                className="tab-strip__inner"
+                onDragOver={(event) => {
+                  if (!draggingTabId) {
+                    return;
+                  }
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  if (!draggingTabId) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setOpenTabs((current) => {
+                    const sourceIndex = current.findIndex((tab) => tab.id === draggingTabId);
+                    if (sourceIndex === -1) {
+                      return current;
+                    }
+                    const next = [...current];
+                    const [moved] = next.splice(sourceIndex, 1);
+                    next.push(moved);
+                    return next;
+                  });
+                  setDraggingTabId(null);
+                }}
+              >
                 {openTabs.map((tab) => {
                   const resource = resourcesByKind.get(tab.kind);
                   const active = tab.id === activeTabId;
                   const closable = openTabs.length > 1;
-                  const cluster = clusters.find((item) => item.id === tab.clusterId) ?? clusters[0];
-                  const title = tab.id === SETTINGS_TAB_ID ? SETTINGS_KIND : resource?.title ?? tab.kind;
+                  const cluster = clusters.find((item) => item.id === tab.clusterId) ?? {
+                    id: "local",
+                    name: "LOCAL",
+                    status: "connected" as const,
+                    accent: "#22c55e",
+                  };
+                  const tabLabel = tab.id === SETTINGS_TAB_ID ? SETTINGS_KIND : tab.id === SETUP_TAB_ID ? "Setup Guide" : resource?.title ?? tab.kind;
+                  const title = cluster.name ? `${tabLabel} · ${cluster.name}` : tabLabel;
 
                   return (
                     <div
                       aria-selected={active}
-                      className={`tab ${active ? "tab--active" : ""}`}
+                      className={`tab ${active ? "tab--active" : ""} ${draggingTabId === tab.id ? "tab--dragging" : ""}`}
                       data-tab-id={tab.id}
+                      draggable
                       key={tab.id}
                       onClick={() => activateTab(tab.id, tab.clusterId)}
+                      onDragEnd={() => setDraggingTabId(null)}
+                      onDragOver={(event) => {
+                        if (!draggingTabId || draggingTabId === tab.id) {
+                          return;
+                        }
+                        event.preventDefault();
+                      }}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", tab.id);
+                        setDraggingTabId(tab.id);
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const sourceId = event.dataTransfer.getData("text/plain") || draggingTabId;
+                        if (sourceId) {
+                          moveTab(sourceId, tab.id);
+                        }
+                        setDraggingTabId(null);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
@@ -468,7 +961,7 @@ function App() {
                       tabIndex={0}
                     >
                       <span className="tab__icon">
-                        <Icon name={tab.id === SETTINGS_TAB_ID ? "settings" : iconNameForItem(tab.kind)} />
+                        <Icon name={tab.id === SETTINGS_TAB_ID || tab.id === SETUP_TAB_ID ? "settings" : iconNameForItem(tab.kind)} />
                       </span>
                       <span className="tab__title">{title}</span>
                       <button
@@ -499,7 +992,10 @@ function App() {
           </div>
         </header>
 
-        <OverlayScrollbarsComponent className="workspace__content scroll-host" options={overlayScrollbarOptions}>
+        <OverlayScrollbarsComponent
+          className={`workspace__content scroll-host ${!settingsTabActive && !setupTabActive ? "workspace__content--compact" : ""}`}
+          options={overlayScrollbarOptions}
+        >
           {settingsTabActive ? (
             <SettingsView
               channel={channel}
@@ -509,87 +1005,50 @@ function App() {
               onCheckUpdates={handleCheckUpdates}
               onForceUpdate={handleForceUpdate}
               onInstallUpdate={handleInstallUpdate}
+              onInstallStandaloneBundle={handleInstallStandaloneBundle}
+              onInstallStandaloneServices={handleInstallStandaloneServices}
               onLogLevelChange={handleLogLevelChange}
+              onRefreshStandaloneStatus={refreshStandaloneStatus}
+              onStartStandaloneServices={handleStartStandaloneServices}
+              onStopStandaloneServices={handleStopStandaloneServices}
+              onUpdateControlPlaneArgs={setControlPlaneArgs}
+              onUpdateRuntimeArgs={setRuntimeArgs}
+              standaloneBusy={managingStandalone}
+              standaloneControlPlaneArgs={controlPlaneArgs}
+              standaloneRuntimeArgs={runtimeArgs}
+              standaloneStatus={standaloneStatus}
+              standaloneStatusMessage={standaloneStatusMessage}
               updateStatus={updateStatus}
             />
+          ) : setupTabActive ? (
+            <SetupGuideView
+              connectingGui={connectingGui}
+              guiConnectionStatus={guiConnectionStatus}
+              guiConnectionYaml={guiConnectionYaml}
+              onConnect={handleConnectGui}
+              onYamlChange={setGuiConnectionYaml}
+            />
           ) : (
-            <>
-              <div className="editor-header">
-                <div>
-                  <div className="editor-header__title">{activeResource?.title}</div>
-                  <div className="editor-header__subtitle">
-                    {activeCluster.name} / {activeResource?.kind} / {controlPlane.apiVersion}
-                  </div>
-                </div>
-                <div className="editor-header__pills">
-                  <span className="pill">{activeCluster.status}</span>
-                  <span className="pill pill--muted">
-                    {String(activeResource?.sample.metadata?.name ?? "resource")}
-                  </span>
-                </div>
-              </div>
-
-              <section className="hero-bar">
-                {highlights.map((item) => (
-                  <article className="hero-stat" key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </article>
-                ))}
-              </section>
-
-              <section className="workspace-grid">
-                <SchemaSection
-                  description="Identity and placement fields."
-                  rows={getSectionPreview(activeResource!, "metadata", activeResource!.sections.metadata)}
-                  title="Metadata"
+            <div className="resource-pane">
+              {useLiveTable ? (
+                activeKind === "Node" ? (
+                  <LiveNodeTable rows={activeSnapshot!.nodes} />
+                ) : activeKind === "GroupConfig" ? (
+                  <LiveGroupConfigTable rows={activeSnapshot!.group_config} />
+                ) : (
+                  <LiveEventLogTable rows={activeSnapshot!.event_log} />
+                )
+              ) : activeKindIsApiTable ? (
+                <ApiFetchStateTable
+                  error={activeSnapshotError}
+                  kind={activeKind}
+                  loading={activeSnapshotLoading}
+                  onRetry={() => void fetchSnapshotForCluster(resolvedClusterId)}
                 />
-                <SchemaSection
-                  description="Desired state and user intent."
-                  rows={getSectionPreview(activeResource!, "spec", activeResource!.sections.spec)}
-                  title="Spec"
-                />
-                <SchemaSection
-                  description="Observed state from runtime."
-                  rows={getSectionPreview(activeResource!, "status", activeResource!.sections.status)}
-                  title="Status"
-                />
-              </section>
-
-              <section className="detail-layout">
-                <article className="panel">
-                  <div className="panel__header">
-                    <h3>Fields</h3>
-                    <span className="pill pill--muted">{activeResource!.fields.length} root fields</span>
-                  </div>
-                  <div className="schema-table">
-                    <div className="schema-table__head">
-                      <span>Field</span>
-                      <span>Type</span>
-                      <span>Req</span>
-                    </div>
-                    {activeResource!.fields.map((field) => (
-                      <div className="schema-table__row" key={field.name}>
-                        <span>{field.name}</span>
-                        <span>
-                          {field.type}
-                          {field.isArray ? "[]" : ""}
-                        </span>
-                        <span>{field.required ? "yes" : "no"}</span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="panel">
-                  <div className="panel__header">
-                    <h3>Resource Payload</h3>
-                    <span className="pill">{activeResource!.kind}</span>
-                  </div>
-                  <pre className="json-viewer">{JSON.stringify(activeResource!.sample, null, 2)}</pre>
-                </article>
-              </section>
-            </>
+              ) : (
+                <ApiUnavailableTable kind={activeResource?.kind ?? activeKind} />
+              )}
+            </div>
           )}
         </OverlayScrollbarsComponent>
       </section>
@@ -603,6 +1062,7 @@ function ClusterTree({
   cluster,
   expanded,
   items,
+  onEditCluster,
   onOpen,
   onSelectCluster,
   onToggle,
@@ -612,6 +1072,7 @@ function ClusterTree({
   cluster: ClusterEntry;
   expanded: boolean;
   items: NavigationLeaf[];
+  onEditCluster: (clusterId: string) => void;
   onOpen: (kind: string, clusterId: string) => void;
   onSelectCluster: (clusterId: string) => void;
   onToggle: () => void;
@@ -633,6 +1094,26 @@ function ClusterTree({
           <Icon name="cluster" />
         </span>
         <span className="cluster-node__name">{cluster.name}</span>
+        <span
+          className="cluster-node__edit"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onEditCluster(cluster.id);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              event.stopPropagation();
+              onEditCluster(cluster.id);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          title="Cluster config"
+        >
+          <Icon name="settings" />
+        </span>
         <span className={`status-dot status-dot--${cluster.status}`} />
       </button>
 
@@ -657,6 +1138,367 @@ function ClusterTree({
   );
 }
 
+type IdeTableColumn = {
+  key: string;
+  label: string;
+  width: number;
+  minWidth?: number;
+};
+
+type IdeTableRow = {
+  key: string;
+  values: Record<string, string>;
+};
+
+function IdeDataTable({
+  columns,
+  emptyLabel = "No rows",
+  rows,
+}: {
+  columns: IdeTableColumn[];
+  emptyLabel?: string;
+  rows: IdeTableRow[];
+}) {
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
+    columns.reduce<Record<string, number>>((acc, column) => {
+      acc[column.key] = column.width;
+      return acc;
+    }, {}),
+  );
+  const resizingRef = useRef<{ columnKey: string; minWidth: number; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    setColumnWidths(
+      columns.reduce<Record<string, number>>((acc, column) => {
+        acc[column.key] = column.width;
+        return acc;
+      }, {}),
+    );
+  }, [columns]);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      const activeResize = resizingRef.current;
+      if (!activeResize) {
+        return;
+      }
+      const nextWidth = Math.max(activeResize.minWidth, activeResize.startWidth + event.clientX - activeResize.startX);
+      setColumnWidths((current) => ({
+        ...current,
+        [activeResize.columnKey]: nextWidth,
+      }));
+    };
+
+    const onUp = () => {
+      resizingRef.current = null;
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const templateColumns = columns.map((column) => `${columnWidths[column.key] ?? column.width}px`).join(" ");
+
+  return (
+    <div className="schema-table schema-table--live">
+      <div className="schema-table__head" style={{ gridTemplateColumns: templateColumns }}>
+        {columns.map((column) => (
+          <div className="schema-table__cell schema-table__cell--head" key={column.key}>
+            <span>{column.label}</span>
+            <button
+              aria-label={`Resize ${column.label} column`}
+              className="schema-table__resizer"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                resizingRef.current = {
+                  columnKey: column.key,
+                  minWidth: column.minWidth ?? 80,
+                  startWidth: columnWidths[column.key] ?? column.width,
+                  startX: event.clientX,
+                };
+                document.body.style.userSelect = "none";
+              }}
+              type="button"
+            />
+          </div>
+        ))}
+      </div>
+      {rows.length === 0 ? (
+        <div className="schema-table__empty">{emptyLabel}</div>
+      ) : (
+        rows.map((row) => (
+          <div className="schema-table__row" key={row.key} style={{ gridTemplateColumns: templateColumns }}>
+            {columns.map((column) => (
+              <span className="schema-table__cell" key={column.key}>
+                {row.values[column.key] ?? "-"}
+              </span>
+            ))}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function ApiUnavailableTable({ kind }: { kind: string }) {
+  return (
+    <div className="schema-table schema-table--live">
+      <div className="schema-table__empty">
+        API table is available only for Node, Event, and Group Config. No schema fallback for {kind}.
+      </div>
+    </div>
+  );
+}
+
+function ApiFetchStateTable({
+  error,
+  kind,
+  loading,
+  onRetry,
+}: {
+  error: string | null;
+  kind: string;
+  loading: boolean;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="schema-table schema-table--live">
+        <div className="schema-table__empty">Loading {kind} from API...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="schema-table schema-table--live">
+      <div className="schema-table__empty">
+        {error ? `API error: ${error}` : `No API data returned for ${kind}.`}
+      </div>
+      <div className="schema-table__empty">
+        <button className="cluster-editor__button" onClick={onRetry} type="button">Retry API</button>
+      </div>
+    </div>
+  );
+}
+
+function LiveNodeTable({ rows }: { rows: GuiClusterSnapshot["nodes"] }) {
+  const getRawString = (row: GuiClusterSnapshot["nodes"][number], keys: string[]): string | null => {
+    const source = row as unknown as Record<string, unknown>;
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "string" && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return null;
+  };
+
+  const getRawBool = (row: GuiClusterSnapshot["nodes"][number], keys: string[]): boolean | null => {
+    const source = row as unknown as Record<string, unknown>;
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "boolean") {
+        return value;
+      }
+    }
+    return null;
+  };
+
+  const formatDuration = (milliseconds: number): string => {
+    const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    if (totalSeconds < 60) {
+      return `${totalSeconds}s`;
+    }
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    if (totalMinutes < 60) {
+      return `${totalMinutes}m`;
+    }
+    const totalHours = Math.floor(totalMinutes / 60);
+    if (totalHours < 24) {
+      return `${totalHours}h`;
+    }
+    const totalDays = Math.floor(totalHours / 24);
+    return `${totalDays}d`;
+  };
+
+  const endpointList = (row: GuiClusterSnapshot["nodes"][number]): string[] => {
+    const source = (row as { endpoints?: unknown; endpoint?: unknown }).endpoints ?? (row as { endpoint?: unknown }).endpoint;
+    if (Array.isArray(source)) {
+      return source.filter((item): item is string => typeof item === "string");
+    }
+    if (typeof source === "string" && source.length > 0) {
+      return [source];
+    }
+    return [];
+  };
+
+  const primaryIp = (row: GuiClusterSnapshot["nodes"][number]): string => {
+    const first = endpointList(row)[0];
+    if (!first) {
+      return "-";
+    }
+    try {
+      return new URL(first).hostname;
+    } catch {
+      return first;
+    }
+  };
+
+  const nodeType = (row: GuiClusterSnapshot["nodes"][number]): string =>
+    row.leader && row.role === "control-plane" ? "control-plane (leader)" : row.role;
+
+  const nodeVersion = (row: GuiClusterSnapshot["nodes"][number]): string =>
+    getRawString(row, ["xenage_version", "version", "agent_version", "binary_version"]) ?? "-";
+
+  const nodeAge = (row: GuiClusterSnapshot["nodes"][number]): string => {
+    const ageDirect = getRawString(row, ["age", "uptime"]);
+    if (ageDirect) {
+      return ageDirect;
+    }
+    const timestamp = getRawString(row, ["started_at", "created_at", "first_seen_at", "registered_at"]);
+    if (!timestamp) {
+      return "-";
+    }
+    const parsed = Date.parse(timestamp);
+    if (Number.isNaN(parsed)) {
+      return timestamp;
+    }
+    return formatDuration(Date.now() - parsed);
+  };
+
+  const nodeStatus = (row: GuiClusterSnapshot["nodes"][number]): string => {
+    const statusTokens: string[] = [];
+    if (row.leader) {
+      statusTokens.push("leader");
+    }
+    const ready = getRawBool(row, ["ready", "is_ready"]);
+    if (ready !== null) {
+      statusTokens.push(ready ? "ready" : "not-ready");
+    }
+    const extraStatus = getRawString(row, ["status", "state", "health"]);
+    if (extraStatus && !statusTokens.includes(extraStatus)) {
+      statusTokens.push(extraStatus);
+    }
+    return statusTokens.join(", ") || "-";
+  };
+
+  return (
+    <IdeDataTable
+      columns={[
+        { key: "ip", label: "IP", width: 220, minWidth: 110 },
+        { key: "name", label: "Name", width: 300, minWidth: 150 },
+        { key: "type", label: "Type", width: 220, minWidth: 120 },
+        { key: "version", label: "Version", width: 130, minWidth: 90 },
+        { key: "age", label: "Age", width: 90, minWidth: 70 },
+        { key: "status", label: "Status", width: 220, minWidth: 150 },
+        { key: "endpoint", label: "Endpoint", width: 520, minWidth: 240 },
+      ]}
+      rows={rows.map((row) => ({
+        key: row.node_id,
+        values: {
+          ip: primaryIp(row),
+          name: row.node_id,
+          type: nodeType(row),
+          version: nodeVersion(row),
+          age: nodeAge(row),
+          status: nodeStatus(row),
+          endpoint: endpointList(row).join(", ") || "-",
+        },
+      }))}
+    />
+  );
+}
+
+function LiveGroupConfigTable({ rows }: { rows: GuiClusterSnapshot["group_config"] }) {
+  return (
+    <IdeDataTable
+      columns={[
+        { key: "key", label: "Key", width: 320, minWidth: 140 },
+        { key: "value", label: "Value", width: 760, minWidth: 220 },
+      ]}
+      rows={rows.map((row) => ({
+        key: row.key,
+        values: {
+          key: row.key,
+          value: row.value,
+        },
+      }))}
+    />
+  );
+}
+
+function LiveEventLogTable({ rows }: { rows: GuiClusterSnapshot["event_log"] }) {
+  return (
+    <IdeDataTable
+      columns={[
+        { key: "sequence", label: "#", width: 80, minWidth: 60 },
+        { key: "happenedAt", label: "At", width: 300, minWidth: 170 },
+        { key: "actor", label: "Actor", width: 280, minWidth: 130 },
+        { key: "action", label: "Action", width: 560, minWidth: 200 },
+      ]}
+      rows={rows.map((row) => ({
+        key: String(row.sequence),
+        values: {
+          sequence: String(row.sequence),
+          happenedAt: row.happened_at,
+          actor: `${row.actor_type}/${row.actor_id}`,
+          action: row.action,
+        },
+      }))}
+    />
+  );
+}
+
+function SetupGuideView({
+  connectingGui,
+  guiConnectionStatus,
+  guiConnectionYaml,
+  onConnect,
+  onYamlChange,
+}: {
+  connectingGui: boolean;
+  guiConnectionStatus: string | null;
+  guiConnectionYaml: string;
+  onConnect: () => Promise<void>;
+  onYamlChange: (value: string) => void;
+}) {
+  return (
+    <section className="settings-view">
+      <div className="editor-header">
+        <div>
+          <div className="editor-header__title">Setup Guide</div>
+          <div className="editor-header__subtitle">Paste GUI connection YAML and connect to the docker-compose control-plane.</div>
+        </div>
+        <div className="editor-header__pills">
+          <span className="pill">onboarding</span>
+          <span className="pill pill--muted">admin</span>
+        </div>
+      </div>
+
+      <section className="connection-panel">
+        <div className="connection-panel__header">
+          <h3>Cluster Connection (YAML)</h3>
+          <button className="settings-button" disabled={connectingGui} onClick={() => void onConnect()} type="button">
+            {connectingGui ? "Connecting..." : "Connect"}
+          </button>
+        </div>
+        <textarea
+          className="connection-panel__editor"
+          onChange={(event) => onYamlChange(event.target.value)}
+          spellCheck={false}
+          value={guiConnectionYaml}
+        />
+        {guiConnectionStatus ? <div className="connection-panel__status">{guiConnectionStatus}</div> : null}
+      </section>
+    </section>
+  );
+}
+
 function SettingsView({
   channel,
   checkingUpdates,
@@ -664,8 +1506,20 @@ function SettingsView({
   onChannelChange,
   onCheckUpdates,
   onForceUpdate,
+  onInstallStandaloneBundle,
+  onInstallStandaloneServices,
   onInstallUpdate,
   onLogLevelChange,
+  onRefreshStandaloneStatus,
+  onStartStandaloneServices,
+  onStopStandaloneServices,
+  onUpdateControlPlaneArgs,
+  onUpdateRuntimeArgs,
+  standaloneBusy,
+  standaloneControlPlaneArgs,
+  standaloneRuntimeArgs,
+  standaloneStatus,
+  standaloneStatusMessage,
   updateStatus,
 }: {
   channel: UpdateChannel;
@@ -674,8 +1528,20 @@ function SettingsView({
   onChannelChange: (channel: UpdateChannel) => void;
   onCheckUpdates: () => Promise<void>;
   onForceUpdate: () => Promise<void>;
+  onInstallStandaloneBundle: () => Promise<void>;
+  onInstallStandaloneServices: () => Promise<void>;
   onInstallUpdate: () => Promise<void>;
   onLogLevelChange: (level: LogLevel) => void;
+  onRefreshStandaloneStatus: () => Promise<StandaloneStatus | null>;
+  onStartStandaloneServices: () => Promise<void>;
+  onStopStandaloneServices: () => Promise<void>;
+  onUpdateControlPlaneArgs: (value: string) => void;
+  onUpdateRuntimeArgs: (value: string) => void;
+  standaloneBusy: boolean;
+  standaloneControlPlaneArgs: string;
+  standaloneRuntimeArgs: string;
+  standaloneStatus: StandaloneStatus | null;
+  standaloneStatusMessage: string | null;
   updateStatus: string | null;
 }) {
   return (
@@ -750,6 +1616,66 @@ function SettingsView({
           <div className="settings-status">
             <strong>Status</strong>
             <span>{updateStatus ?? "No update action yet."}</span>
+          </div>
+        </article>
+
+        <article className="panel settings-card settings-card--full">
+          <div className="panel__header panel__header--stacked">
+            <h3>Standalone Services</h3>
+            <p>Install node binaries and run control-plane/runtime as OS-managed services.</p>
+          </div>
+
+          <div className="settings-actions">
+            <button className="settings-button" disabled={standaloneBusy} onClick={onInstallStandaloneBundle} type="button">
+              {standaloneBusy ? "Working..." : "Download binaries"}
+            </button>
+            <button className="settings-button" disabled={standaloneBusy} onClick={onInstallStandaloneServices} type="button">
+              Install services
+            </button>
+            <button className="settings-button" disabled={standaloneBusy} onClick={onStartStandaloneServices} type="button">
+              Start services
+            </button>
+            <button
+              className="settings-button settings-button--muted"
+              disabled={standaloneBusy}
+              onClick={onStopStandaloneServices}
+              type="button"
+            >
+              Stop services
+            </button>
+            <button className="settings-button settings-button--muted" disabled={standaloneBusy} onClick={() => void onRefreshStandaloneStatus()} type="button">
+              Refresh status
+            </button>
+          </div>
+
+          <div className="settings-grid settings-grid--nested">
+            <label className="settings-field">
+              <span>Control Plane Args (one token per line)</span>
+              <textarea
+                className="settings-textarea"
+                onChange={(event) => onUpdateControlPlaneArgs(event.target.value)}
+                value={standaloneControlPlaneArgs}
+              />
+            </label>
+            <label className="settings-field">
+              <span>Runtime Args (one token per line)</span>
+              <textarea
+                className="settings-textarea"
+                onChange={(event) => onUpdateRuntimeArgs(event.target.value)}
+                value={standaloneRuntimeArgs}
+              />
+            </label>
+          </div>
+
+          <div className="settings-status">
+            <strong>Standalone Bundle</strong>
+            <span>Installed: {standaloneStatus?.installed ? "yes" : "no"}</span>
+            <span>Version: {standaloneStatus?.version ?? "n/a"}</span>
+            <span>Asset: {standaloneStatus?.asset_name ?? "n/a"}</span>
+            <span>Location: {standaloneStatus?.install_dir ?? "n/a"}</span>
+            <span>Control Plane Service: {standaloneStatus?.control_plane_service?.state ?? "unknown"}</span>
+            <span>Runtime Service: {standaloneStatus?.runtime_service?.state ?? "unknown"}</span>
+            <span>{standaloneStatusMessage ?? "No standalone action yet."}</span>
           </div>
         </article>
       </section>
@@ -862,37 +1788,6 @@ function Icon({ name }: { name: IconName }) {
   };
 
   return <svg {...common}>{icons[name]}</svg>;
-}
-
-function SchemaSection({
-  title,
-  description,
-  rows,
-}: {
-  title: string;
-  description: string;
-  rows: Array<{ name: string; type: string; value: string }>;
-}) {
-  return (
-    <article className="panel panel--compact">
-      <div className="panel__header panel__header--stacked">
-        <h3>{title}</h3>
-        <p>{description}</p>
-      </div>
-
-      <div className="section-rows">
-        {rows.map((row) => (
-          <div className="section-row" key={row.name}>
-            <div>
-              <strong>{row.name}</strong>
-              <span>{row.type}</span>
-            </div>
-            <code>{row.value}</code>
-          </div>
-        ))}
-      </div>
-    </article>
-  );
 }
 
 export default App;

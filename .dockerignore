@@ -1,0 +1,17 @@
+.git
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+apps
+brand
+docs
+.idea
+.github
+tests/__pycache__
+tests/integration/__pycache__
+apps/*/.pytest_cache
+apps/*/*/__pycache__
+apps/*/*.egg-info

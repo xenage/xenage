@@ -46,10 +46,15 @@ export class UpdateService {
   }
 
   static async subscribeToLogs(handler: (event: UpdateLogEvent) => void): Promise<() => void> {
-    return listen<UpdateLogEvent>(this.LOG_EVENT, ({ payload }) => {
-      logger.debug('Updater event received', payload);
-      handler(payload);
-    });
+    try {
+      return await listen<UpdateLogEvent>(this.LOG_EVENT, ({ payload }) => {
+        logger.debug('Updater event received', payload);
+        handler(payload);
+      });
+    } catch (error) {
+      logger.warn('Updater log subscription unavailable', error);
+      return () => {};
+    }
   }
 
   /**

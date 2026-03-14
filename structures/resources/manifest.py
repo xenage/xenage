@@ -7,66 +7,22 @@ import msgspec
 
 from ..base import Structure
 from .base import ResourceDocument
-from .cluster import Cluster, Node
-from .governance import (
-    AccessControl,
-    ConfigHistory,
-    CustomResource,
-    ResourceType,
-    Secret,
-)
-from .integration import APIAccess, MCP, Model, Tool
-from .observability import Alert, Event, Log
-from .runtime import Agent, ExecutionEnvironment, Interface, Job, Run, Session, Usage
+from .cluster import Node
+from .membership import GroupConfig
+from .observability import Event
 
 RESOURCE_TYPES: tuple[type[ResourceDocument], ...] = (
-    Cluster,
     Node,
-    Agent,
-    Run,
-    Session,
-    Tool,
-    MCP,
-    Job,
+    GroupConfig,
     Event,
-    Log,
-    ResourceType,
-    CustomResource,
-    ExecutionEnvironment,
-    Secret,
-    AccessControl,
-    Interface,
-    Model,
-    APIAccess,
-    ConfigHistory,
-    Alert,
-    Usage,
 )
 
 NAVIGATION = {
     "label": "Cluster",
     "children": [
-        {"label": "Overview", "kind": "Cluster"},
         {"label": "Nodes", "kind": "Node"},
-        {"label": "Agents", "kind": "Agent"},
-        {"label": "Runs", "kind": "Run"},
-        {"label": "Sessions", "kind": "Session"},
-        {"label": "Tools", "kind": "Tool"},
-        {"label": "MCP", "kind": "MCP"},
-        {"label": "Jobs", "kind": "Job"},
+        {"label": "Group Config", "kind": "GroupConfig"},
         {"label": "Events", "kind": "Event"},
-        {"label": "Logs", "kind": "Log"},
-        {"label": "Resource Types", "kind": "ResourceType"},
-        {"label": "Custom Resources", "kind": "CustomResource"},
-        {"label": "Execution Environments", "kind": "ExecutionEnvironment"},
-        {"label": "Secrets", "kind": "Secret"},
-        {"label": "Access Control", "kind": "AccessControl"},
-        {"label": "Interfaces", "kind": "Interface"},
-        {"label": "Models", "kind": "Model"},
-        {"label": "API Access", "kind": "APIAccess"},
-        {"label": "Config History", "kind": "ConfigHistory"},
-        {"label": "Alerts", "kind": "Alert"},
-        {"label": "Usage", "kind": "Usage"},
     ],
 }
 
