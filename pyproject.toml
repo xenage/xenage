@@ -1,0 +1,11 @@
+[project]
+name = "xenage-structures"
+version = "0.1.0"
+description = "Shared control plane structures for Xenage runtime and GUI."
+requires-python = ">=3.13"
+dependencies = [
+  "msgspec>=0.19.0",
+]
+
+[tool.setuptools]
+packages = ["structures"]

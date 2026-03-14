@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import { ask } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { logger } from './logger';
 
 /**
  * Update service abstraction for Xenage GUI.
@@ -17,8 +18,22 @@ export interface UpdateInfo {
   target?: string;
 }
 
+export interface UpdateLogEvent {
+  channel: UpdateChannel;
+  endpoint: string;
+  step: string;
+  message: string;
+  force: boolean;
+  current_version?: string;
+  version?: string;
+  target?: string;
+  downloaded_bytes?: number;
+  content_length?: number;
+}
+
 export class UpdateService {
   private static readonly CHANNEL_KEY = 'xenage-update-channel';
+  private static readonly LOG_EVENT = 'updater://log';
 
   static getChannel(): UpdateChannel {
     const channel = localStorage.getItem(this.CHANNEL_KEY);
@@ -27,6 +42,14 @@ export class UpdateService {
 
   static setChannel(channel: UpdateChannel) {
     localStorage.setItem(this.CHANNEL_KEY, channel);
+    logger.info('Update channel changed', { channel });
+  }
+
+  static async subscribeToLogs(handler: (event: UpdateLogEvent) => void): Promise<() => void> {
+    return listen<UpdateLogEvent>(this.LOG_EVENT, ({ payload }) => {
+      logger.debug('Updater event received', payload);
+      handler(payload);
+    });
   }
 
   /**
@@ -35,7 +58,7 @@ export class UpdateService {
    */
   static async checkForUpdates(): Promise<UpdateInfo | null> {
     const channel = this.getChannel();
-    console.log(`Checking for updates on channel: ${channel}...`);
+    logger.info('Checking for updates', { channel });
     
     try {
       const update = await invoke<UpdateInfo | null>('check_for_updates', {
@@ -44,11 +67,12 @@ export class UpdateService {
       });
 
       if (update) {
-        console.log(`Update available: ${update.version}`);
+        logger.info('Update available', update);
         return update;
       }
+      logger.info('No updates available', { channel });
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      logger.error('Failed to check for updates', error);
     }
 
     return null; 
@@ -58,7 +82,7 @@ export class UpdateService {
    */
   static async downloadUpdate(): Promise<boolean> {
     const channel = this.getChannel();
-    console.log(`Downloading and installing update for channel: ${channel}...`);
+    logger.info('Downloading and installing update', { channel });
     
     try {
       const installed = await invoke<boolean>('install_update', {
@@ -67,18 +91,15 @@ export class UpdateService {
       });
 
       if (installed) {
-        const confirm = await ask('The update has been installed. Do you want to restart the application now?', {
-          title: 'Update successful',
-          kind: 'info',
+        logger.info('Update installed successfully, restarting application');
+        void relaunch().catch((error) => {
+          logger.error('Failed to relaunch after successful update install', error);
         });
-
-        if (confirm) {
-          await relaunch();
-        }
         return true;
       }
+      logger.warn('Install update returned false', { channel });
     } catch (error) {
-      console.error('Failed to download/install update:', error);
+      logger.error('Failed to download/install update', error);
     }
 
     return false;
@@ -92,7 +113,7 @@ export class UpdateService {
   static async forceUpdateDev(): Promise<boolean> {
     const channel = this.getChannel();
     if (channel !== 'dev') {
-      console.warn('Force update is only available on dev channel');
+      logger.warn('Force update is only available on dev channel');
       return false;
     }
  
@@ -103,19 +124,17 @@ export class UpdateService {
       });
 
       if (installed) {
-        const confirm = await ask('The dev update has been installed. Do you want to restart the application now?', {
-          title: 'Update successful',
-          kind: 'info',
+        logger.info('Dev update installed successfully, restarting application');
+        void relaunch().catch((error) => {
+          logger.error('Failed to relaunch after successful dev update install', error);
         });
-
-        if (confirm) {
-          await relaunch();
-        }
+      } else {
+        logger.warn('Dev force update returned false');
       }
 
       return installed;
     } catch (error) {
-      console.error('Failed to force update dev release:', error);
+      logger.error('Failed to force update dev release', error);
       return false;
     }
   }

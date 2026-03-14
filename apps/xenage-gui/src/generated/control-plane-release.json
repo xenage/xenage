@@ -1,0 +1,3225 @@
+{
+  "apiVersion": "xenage.io/v1alpha1",
+  "kind": "ControlPlaneRelease",
+  "generatedAt": "2026-03-14T12:30:00Z",
+  "product": {
+    "name": "Xenage",
+    "tagline": "AI Agent Control Plane"
+  },
+  "navigation": {
+    "label": "Cluster",
+    "children": [
+      {
+        "label": "Overview",
+        "kind": "Cluster"
+      },
+      {
+        "label": "Nodes",
+        "kind": "Node"
+      },
+      {
+        "label": "Agents",
+        "kind": "Agent"
+      },
+      {
+        "label": "Runs",
+        "kind": "Run"
+      },
+      {
+        "label": "Sessions",
+        "kind": "Session"
+      },
+      {
+        "label": "Tools",
+        "kind": "Tool"
+      },
+      {
+        "label": "MCP",
+        "kind": "MCP"
+      },
+      {
+        "label": "Jobs",
+        "kind": "Job"
+      },
+      {
+        "label": "Events",
+        "kind": "Event"
+      },
+      {
+        "label": "Logs",
+        "kind": "Log"
+      },
+      {
+        "label": "Resource Types",
+        "kind": "ResourceType"
+      },
+      {
+        "label": "Custom Resources",
+        "kind": "CustomResource"
+      },
+      {
+        "label": "Execution Environments",
+        "kind": "ExecutionEnvironment"
+      },
+      {
+        "label": "Secrets",
+        "kind": "Secret"
+      },
+      {
+        "label": "Access Control",
+        "kind": "AccessControl"
+      },
+      {
+        "label": "Interfaces",
+        "kind": "Interface"
+      },
+      {
+        "label": "Models",
+        "kind": "Model"
+      },
+      {
+        "label": "API Access",
+        "kind": "APIAccess"
+      },
+      {
+        "label": "Config History",
+        "kind": "ConfigHistory"
+      },
+      {
+        "label": "Alerts",
+        "kind": "Alert"
+      },
+      {
+        "label": "Usage",
+        "kind": "Usage"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "kind": "Cluster",
+      "title": "Cluster",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ClusterSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ClusterStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "displayName",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "provider",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "region",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "runtimeVersion",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "controlPlaneEndpoint",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "health",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "nodesReady",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "agentsReady",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "activeAlerts",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "demo-cluster",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "displayName": "Demo Cluster",
+          "provider": "Bare Metal",
+          "region": "fra-1",
+          "runtimeVersion": "0.1.0",
+          "controlPlaneEndpoint": "https://control.demo.xenage.local"
+        },
+        "status": {
+          "phase": "Ready",
+          "health": "Healthy",
+          "nodesReady": 6,
+          "agentsReady": 23,
+          "activeAlerts": 1
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Node",
+      "title": "Node",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "NodeSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "NodeStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "role",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "architecture",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "runtime",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "zone",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "taints",
+            "type": "str",
+            "required": false,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "cpuUsagePct",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "memoryUsagePct",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "sessionsRunning",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "node-a",
+          "namespace": "default",
+          "labels": {
+            "topology.kubernetes.io/zone": "fra-1a"
+          },
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "role": "worker",
+          "architecture": "arm64",
+          "runtime": "containerd",
+          "zone": "fra-1a",
+          "taints": []
+        },
+        "status": {
+          "phase": "Ready",
+          "cpuUsagePct": 48,
+          "memoryUsagePct": 61,
+          "sessionsRunning": 14
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Agent",
+      "title": "Agent",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "AgentSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "AgentStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "modelRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "toolchain",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "concurrency",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "executionEnvironment",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "interfaceRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "replicas",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "activeRuns",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "successRatePct",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "research-agent",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "modelRef": "gpt-5.4",
+          "toolchain": [
+            "browser",
+            "shell",
+            "mcp"
+          ],
+          "concurrency": 8,
+          "executionEnvironment": "python-sandbox",
+          "interfaceRef": "chat-ui"
+        },
+        "status": {
+          "phase": "Running",
+          "replicas": 4,
+          "activeRuns": 12,
+          "successRatePct": 97
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Run",
+      "title": "Run",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "RunSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "RunStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "agentRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "trigger",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "priority",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "timeoutSeconds",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "nodeName",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "durationSeconds",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "tokensConsumed",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "run-4f9a",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "agentRef": "research-agent",
+          "trigger": "schedule/daily-brief",
+          "priority": "high",
+          "timeoutSeconds": 900
+        },
+        "status": {
+          "phase": "Running",
+          "nodeName": "node-a",
+          "durationSeconds": 214,
+          "tokensConsumed": 18420
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Session",
+      "title": "Session",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "SessionSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "SessionStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "agentRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "userId",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "interfaceRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "sharedContextRefs",
+            "type": "str",
+            "required": false,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "transport",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastActivityAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "session-82a1",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "agentRef": "research-agent",
+          "userId": "ops@example.com",
+          "interfaceRef": "desktop",
+          "sharedContextRefs": []
+        },
+        "status": {
+          "phase": "Open",
+          "transport": "desktop",
+          "lastActivityAt": "2026-03-14T12:30:00Z"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Tool",
+      "title": "Tool",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ToolSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ToolStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "driver",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "permissions",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "timeoutSeconds",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "cacheTtlSeconds",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "version",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "invocationsLastHour",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "browser",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "driver": "builtin.web",
+          "permissions": [
+            "net.read"
+          ],
+          "timeoutSeconds": 60,
+          "cacheTtlSeconds": 30
+        },
+        "status": {
+          "phase": "Available",
+          "version": "1.2.0",
+          "invocationsLastHour": 1420
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "MCP",
+      "title": "MCP",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "MCPSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "MCPStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "transport",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "endpoint",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "capabilities",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "authSecretRef",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "latencyMs",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "toolsExposed",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "github",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "transport": "http",
+          "endpoint": "https://mcp.github.internal",
+          "capabilities": [
+            "issues",
+            "prs",
+            "search"
+          ],
+          "authSecretRef": null
+        },
+        "status": {
+          "phase": "Connected",
+          "latencyMs": 92,
+          "toolsExposed": 17
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Job",
+      "title": "Job",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "JobSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "JobStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "schedule",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "concurrencyPolicy",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "templateRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "suspend",
+            "type": "bool",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastRunAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "successCount",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "failureCount",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "nightly-sync",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "schedule": "0 */6 * * *",
+          "concurrencyPolicy": "Forbid",
+          "templateRef": "sync-template",
+          "suspend": false
+        },
+        "status": {
+          "phase": "Scheduled",
+          "lastRunAt": "2026-03-14T06:00:00Z",
+          "successCount": 41,
+          "failureCount": 2
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Event",
+      "title": "Event",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "EventSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "EventStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "regarding",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "type",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "reason",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "message",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastSeenAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "event-1d2f",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "regarding": "Agent/research-agent",
+          "type": "Normal",
+          "reason": "Scaled",
+          "message": "Scaled replicas from 2 to 4"
+        },
+        "status": {
+          "phase": "Observed",
+          "count": 1,
+          "lastSeenAt": "2026-03-14T12:24:00Z"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Log",
+      "title": "Log",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "LogSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "LogStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "sourceRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "stream",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "retentionHours",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "indexName",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "entriesLastMinute",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastOffset",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "run-4f9a-logs",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "sourceRef": "Run/run-4f9a",
+          "stream": "stdout",
+          "retentionHours": 168,
+          "indexName": "logs-runs"
+        },
+        "status": {
+          "phase": "Streaming",
+          "entriesLastMinute": 84,
+          "lastOffset": "582019"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "ResourceType",
+      "title": "ResourceType",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ResourceTypeSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ResourceTypeStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "group",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "version",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "scope",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "printerColumns",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "instances",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "schemaVersion",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "agents.xenage.io",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "group": "xenage.io",
+          "version": "v1alpha1",
+          "scope": "Namespaced",
+          "printerColumns": [
+            "phase",
+            "replicas",
+            "successRatePct"
+          ]
+        },
+        "status": {
+          "phase": "Published",
+          "instances": 8,
+          "schemaVersion": "2026-03-14"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "CustomResource",
+      "title": "CustomResource",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "CustomResourceSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "CustomResourceStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "typeRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "owner",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "desiredState",
+            "type": "map",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastAppliedAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "driftDetected",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "support-bot-prod",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "typeRef": "Agent",
+          "owner": "customer-success",
+          "desiredState": {
+            "replicas": "3",
+            "modelRef": "gpt-5.4-mini"
+          }
+        },
+        "status": {
+          "phase": "Ready",
+          "lastAppliedAt": "2026-03-14T08:12:00Z",
+          "driftDetected": false
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "ExecutionEnvironment",
+      "title": "ExecutionEnvironment",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ExecutionEnvironmentSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ExecutionEnvironmentStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "image",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "runtime",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "isolation",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "toolRefs",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "warmPools",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "averageStartupMs",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "python-sandbox",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "image": "ghcr.io/xenage/python-sandbox:0.1.0",
+          "runtime": "python",
+          "isolation": "microvm",
+          "toolRefs": [
+            "browser",
+            "shell"
+          ]
+        },
+        "status": {
+          "phase": "Ready",
+          "warmPools": 12,
+          "averageStartupMs": 180
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Secret",
+      "title": "Secret",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "SecretSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "SecretStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "type",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "mountTargets",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "rotationPolicy",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastRotatedAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "consumers",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "openai-api-key",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "type": "APIKey",
+          "mountTargets": [
+            "Agent/research-agent"
+          ],
+          "rotationPolicy": "30d"
+        },
+        "status": {
+          "phase": "Active",
+          "lastRotatedAt": "2026-03-01T00:00:00Z",
+          "consumers": 3
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "AccessControl",
+      "title": "AccessControl",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "AccessControlSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "AccessControlStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "subject",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "role",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "scope",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "verbs",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "inherited",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastReviewedAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "ops-admin",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "subject": "group:ops",
+          "role": "admin",
+          "scope": "cluster/demo-cluster",
+          "verbs": [
+            "get",
+            "list",
+            "watch",
+            "patch"
+          ]
+        },
+        "status": {
+          "phase": "Bound",
+          "inherited": false,
+          "lastReviewedAt": "2026-03-10T09:00:00Z"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Interface",
+      "title": "Interface",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "InterfaceSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "InterfaceStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "transport",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "authMode",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "routes",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "audience",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "sessionsActive",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "p95LatencyMs",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "desktop",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "transport": "chat",
+          "authMode": "sso",
+          "routes": [
+            "/desktop",
+            "/desktop/agents"
+          ],
+          "audience": "operators"
+        },
+        "status": {
+          "phase": "Online",
+          "sessionsActive": 12,
+          "p95LatencyMs": 280
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Model",
+      "title": "Model",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ModelSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ModelStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "provider",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "contextWindow",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "supportsTools",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "supportsVision",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "averageCostPer1MInput",
+            "type": "float",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "successRatePct",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "gpt-5.4",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "provider": "OpenAI",
+          "contextWindow": 256000,
+          "supportsTools": true,
+          "supportsVision": true
+        },
+        "status": {
+          "phase": "Available",
+          "averageCostPer1MInput": 5.0,
+          "successRatePct": 99
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "APIAccess",
+      "title": "API Access",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "APIAccessSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "APIAccessStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "owner",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "rateLimitPerMinute",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "allowedInterfaces",
+            "type": "str",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "expiresAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastUsedAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "requestsLastHour",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "partner-api",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "owner": "integration-team",
+          "rateLimitPerMinute": 600,
+          "allowedInterfaces": [
+            "api-gateway"
+          ],
+          "expiresAt": "2026-06-01T00:00:00Z"
+        },
+        "status": {
+          "phase": "Issued",
+          "lastUsedAt": "2026-03-14T12:28:00Z",
+          "requestsLastHour": 9211
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "ConfigHistory",
+      "title": "ConfigHistory",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ConfigHistorySpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ConfigHistoryStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "resourceRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "author",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "changeSummary",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "revision",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "changedAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "driftResolved",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "agent-research-agent-r42",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "resourceRef": "Agent/research-agent",
+          "author": "ops@example.com",
+          "changeSummary": "Raised concurrency from 6 to 8",
+          "revision": "42"
+        },
+        "status": {
+          "phase": "Applied",
+          "changedAt": "2026-03-14T07:18:00Z",
+          "driftResolved": true
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Alert",
+      "title": "Alert",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "AlertSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "AlertStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "severity",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "sourceRef",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "signal",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "threshold",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "since",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "notificationsSent",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "latency-spike",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "severity": "warning",
+          "sourceRef": "Interface/desktop",
+          "signal": "p95LatencyMs",
+          "threshold": "> 250 for 5m"
+        },
+        "status": {
+          "phase": "Firing",
+          "since": "2026-03-14T12:20:00Z",
+          "notificationsSent": 3
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Usage",
+      "title": "Usage",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "UsageSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "UsageStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "scope",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "period",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "metrics",
+            "type": "MetricsWindow",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "activeUsers",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "activeAgents",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "cluster-usage",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "scope": "cluster/demo-cluster",
+          "period": "rolling",
+          "metrics": {
+            "lastHour": 18421,
+            "lastDay": 322184,
+            "lastWeek": 2219192
+          }
+        },
+        "status": {
+          "phase": "Current",
+          "activeUsers": 18,
+          "activeAgents": 23
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    }
+  ]
+}
