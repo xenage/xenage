@@ -49,7 +49,9 @@ function parseSemver(version) {
 function makeBuildVersion(version, refName, ciRunNumber) {
   if (refName === 'dev') {
     const parsed = parseSemver(version);
-    return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}-dev.${ciRunNumber}`;
+    // MSI only accepts numeric pre-release identifiers, so dev builds use
+    // the next patch with the CI run number as a numeric pre-release.
+    return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}-${ciRunNumber}`;
   }
 
   return version;
