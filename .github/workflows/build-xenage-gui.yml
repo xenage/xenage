@@ -51,6 +51,15 @@ jobs:
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
+      - name: validate updater configuration
+        shell: bash
+        run: |
+          pubkey="$(node -e "const fs=require('fs'); const config=JSON.parse(fs.readFileSync('apps/xenage-gui/src-tauri/tauri.conf.json','utf8')); process.stdout.write(config.plugins?.updater?.pubkey || '')")"
+          if [ -z "${pubkey}" ] || [ "${pubkey}" = "PLACEHOLDER_PUBKEY" ]; then
+            echo "Updater pubkey is missing or still set to PLACEHOLDER_PUBKEY in apps/xenage-gui/src-tauri/tauri.conf.json"
+            exit 1
+          fi
+
       - name: ensure dev release exists
         id: ensure_dev_release
         if: github.ref == 'refs/heads/dev'
