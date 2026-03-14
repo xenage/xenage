@@ -1,4 +1,4 @@
-import { check } from '@tauri-apps/plugin-updater';
+import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -10,9 +10,11 @@ import { relaunch } from '@tauri-apps/plugin-process';
 export type UpdateChannel = 'main' | 'dev';
 
 export interface UpdateInfo {
+  current_version?: string;
   version: string;
   notes?: string;
   pub_date?: string;
+  target?: string;
 }
 
 export class UpdateService {
@@ -36,16 +38,14 @@ export class UpdateService {
     console.log(`Checking for updates on channel: ${channel}...`);
     
     try {
-      // In Tauri 2.0, endpoints are configured in tauri.conf.json.
-      // We check for updates using the default configuration.
-      const update = await check();
+      const update = await invoke<UpdateInfo | null>('check_for_updates', {
+        channel,
+        force: false,
+      });
+
       if (update) {
         console.log(`Update available: ${update.version}`);
-        return {
-          version: update.version,
-          notes: typeof update.body === 'string' ? update.body : undefined,
-          pub_date: update.date,
-        };
+        return update;
       }
     } catch (error) {
       console.error('Failed to check for updates:', error);
@@ -53,7 +53,6 @@ export class UpdateService {
 
     return null; 
   }
-
   /**
    * Downloads and installs the update.
    */
@@ -62,27 +61,12 @@ export class UpdateService {
     console.log(`Downloading and installing update for channel: ${channel}...`);
     
     try {
-      const update = await check();
-      if (update) {
-        let downloaded = 0;
-        let contentLength = 0;
+      const installed = await invoke<boolean>('install_update', {
+        channel,
+        force: false,
+      });
 
-        await update.downloadAndInstall((event) => {
-          switch (event.event) {
-            case 'Started':
-              contentLength = event.data.contentLength || 0;
-              console.log(`started downloading ${event.data.contentLength} bytes`);
-              break;
-            case 'Progress':
-              downloaded += event.data.chunkLength;
-              console.log(`downloaded ${downloaded} from ${contentLength}`);
-              break;
-            case 'Finished':
-              console.log('download finished');
-              break;
-          }
-        });
-
+      if (installed) {
         const confirm = await ask('The update has been installed. Do you want to restart the application now?', {
           title: 'Update successful',
           kind: 'info',
@@ -98,5 +82,41 @@ export class UpdateService {
     }
 
     return false;
+  }
+
+  /**
+   * Forces an update on the dev channel regardless of the current version.
+   * In a real app, this might involve ignoring version checks if possible,
+   * but here we just re-check and prompt for download.
+   */
+  static async forceUpdateDev(): Promise<boolean> {
+    const channel = this.getChannel();
+    if (channel !== 'dev') {
+      console.warn('Force update is only available on dev channel');
+      return false;
+    }
+ 
+    try {
+      const installed = await invoke<boolean>('install_update', {
+        channel,
+        force: true,
+      });
+
+      if (installed) {
+        const confirm = await ask('The dev update has been installed. Do you want to restart the application now?', {
+          title: 'Update successful',
+          kind: 'info',
+        });
+
+        if (confirm) {
+          await relaunch();
+        }
+      }
+
+      return installed;
+    } catch (error) {
+      console.error('Failed to force update dev release:', error);
+      return false;
+    }
   }
 }

@@ -38,6 +38,22 @@ function App() {
     setStatus(`Switched to ${newChannel} channel.`);
   };
 
+  const handleForceUpdate = async () => {
+    setChecking(true);
+    setStatus("Forcing update from development channel...");
+    try {
+      const success = await UpdateService.forceUpdateDev();
+      if (!success) {
+        setStatus("No update available or force update failed.");
+      }
+    } catch (error) {
+      console.error(error);
+      setStatus("Error during force update.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return (
     <main className="container">
       <h1>Xenage</h1>
@@ -50,9 +66,16 @@ function App() {
           </select>
         </div>
         <br />
-        <button onClick={handleCheckUpdates} disabled={checking}>
-          {checking ? "Checking..." : "Check for updates"}
-        </button>
+        <div className="button-group">
+          <button onClick={handleCheckUpdates} disabled={checking}>
+            {checking ? "Checking..." : "Check for updates"}
+          </button>
+          {channel === 'dev' && (
+            <button onClick={handleForceUpdate} disabled={checking} className="secondary">
+              Force Update (Dev)
+            </button>
+          )}
+        </div>
         {status && <p className="status-message">{status}</p>}
       </div>
     </main>

@@ -15,6 +15,8 @@ tauri-plugin-dialog = "2.0"
 tauri-plugin-process = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tauri-plugin-os = "2.0"
+url = "2"
 
 [features]
 # default enables tauri's standard feature set

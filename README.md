@@ -1,8 +1,6 @@
 # Run, control and observe AI agents
 ### Inspired by Kubernetes and Lens — but built for agents.
 
-[xenage.dev](https://xenage.dev)
-
 - Typed cross-cluster agent configuration
 - Cluster-wide Agent Control Plane
 - Scoped Secrets + RBAC security model

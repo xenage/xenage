@@ -204,3 +204,18 @@
   background: var(--bg);
   color: var(--text);
 }
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+button.secondary {
+  background-color: #646cff;
+}
+
+button.secondary:hover {
+  background-color: #535bf2;
+}

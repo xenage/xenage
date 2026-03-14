@@ -19,6 +19,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -42,6 +44,37 @@ jobs:
         run: yarn install
         working-directory: apps/xenage-gui
 
+      - name: prepare release version
+        id: release_meta
+        run: node .github/scripts/prepare-xenage-gui-version.mjs
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+      - name: ensure dev release exists
+        id: ensure_dev_release
+        if: github.ref == 'refs/heads/dev'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_NAME: ${{ steps.release_meta.outputs.release_name }}
+          RELEASE_BODY: Automated release from GitHub Actions
+        shell: bash
+        run: |
+          release_id="$(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}" --jq '.id' 2>/dev/null || true)"
+          if [ -n "${release_id}" ]; then
+            gh release edit "${RELEASE_TAG}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}" --prerelease
+          else
+            gh release create "${RELEASE_TAG}" \
+              --target "${GITHUB_SHA}" \
+              --title "${RELEASE_NAME}" \
+              --notes "${RELEASE_BODY}" \
+              --prerelease
+            release_id="$(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          fi
+          echo "release_id=${release_id}" >> "${GITHUB_OUTPUT}"
+
       - name: build frontend and tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -50,11 +83,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           projectPath: apps/xenage-gui
-          tagName: ${{ github.ref == 'refs/heads/dev' && 'xenage-gui-dev' || 'xenage-gui-v__VERSION__' }}
-          releaseName: ${{ github.ref == 'refs/heads/dev' && 'Xenage GUI Development' || 'Xenage GUI v__VERSION__' }}
+          releaseId: ${{ github.ref == 'refs/heads/dev' && steps.ensure_dev_release.outputs.release_id || '' }}
+          tagName: ${{ steps.release_meta.outputs.release_tag }}
+          releaseName: ${{ steps.release_meta.outputs.release_name }}
           releaseBody: "Automated release from GitHub Actions"
-          releaseDraft: true
+          releaseDraft: false
           prerelease: ${{ github.ref == 'refs/heads/dev' }}
+          releaseCommitish: ${{ github.sha }}
           args: ""
 
       - name: upload artifacts
@@ -67,4 +102,7 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/dmg/*.dmg
             apps/xenage-gui/src-tauri/target/release/bundle/deb/*.deb
             apps/xenage-gui/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/xenage-gui/src-tauri/target/release/bundle/**/*.tar.gz
+            apps/xenage-gui/src-tauri/target/release/bundle/**/*.zip
+            apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
             apps/xenage-gui/src-tauri/target/release/*.sig
