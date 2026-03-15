@@ -28,17 +28,6 @@ class UserStateManager:
     def get_state(self) -> UserState:
         return self.current
 
-    def refresh_from_storage(self) -> UserState:
-        disk_state = self.storage.load_user_state()
-        if disk_state.version > self.current.version:
-            logger.debug(
-                "refreshing user state from storage current_version={} disk_version={}",
-                self.current.version,
-                disk_state.version,
-            )
-            self.current = disk_state
-        return self.current
-
     def replace_state(self, user_state: UserState) -> UserState:
         if user_state.version < self.current.version:
             raise UserStateValidationError("user state version regressed")
@@ -46,7 +35,7 @@ class UserStateManager:
         self.storage.save_user_state(user_state)
         return user_state
 
-    def ensure_admin(self, user_id: str, public_key: str) -> UserRecord:
+    def ensure_admin(self, user_id: str, public_key: str, read_only: bool = False) -> UserRecord:
         existing = next((item for item in self.current.users if item.user_id == user_id), None)
         if existing is not None:
             if existing.public_key != public_key:
@@ -54,6 +43,9 @@ class UserStateManager:
             if not existing.enabled:
                 raise UserStateValidationError("admin user is disabled")
             return existing
+
+        if read_only:
+             raise UserStateValidationError("admin user not found and running in read-only mode")
 
         user = UserRecord(
             user_id=user_id,

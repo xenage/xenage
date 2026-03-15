@@ -49,8 +49,8 @@ DEFAULT_CONFIG = AppConfig(
     control_plane=ControlPlaneConfig(
         init_ttl_seconds=60,
         bootstrap_ttl_seconds=300,
-        state_ttl_seconds=15,
-        failover_check_interval_seconds=2,
+        state_ttl_seconds=5,
+        failover_check_interval_seconds=1,
         failover_escalation_seconds=15,
         auto_failover=True,
     ),

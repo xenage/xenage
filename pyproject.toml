@@ -8,11 +8,13 @@ dependencies = [
   "cryptography>=45.0.0",
   "loguru>=0.7.3",
   "dynaconf>=3.2.11",
+  "aiohttp>=3.11.0",
 ]
 
 [project.scripts]
 xenage-control-plane = "xenage.cli:control_plane_main"
 xenage-runtime = "xenage.cli:runtime_main"
+xenage = "xenage.cli:xenage_cli_main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

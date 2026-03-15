@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { GuiClusterSnapshot } from "../types/guiConnection";
+import type { GuiClusterSnapshot, GuiEventPage } from "../types/guiConnection";
 
 export interface StoredClusterConnection {
   id: string;
@@ -18,8 +18,30 @@ export class ClusterConnectionService {
     return invoke<GuiClusterSnapshot>("fetch_cluster_snapshot_from_yaml", { configYaml });
   }
 
+  static async fetchEventPageFromYaml(
+    configYaml: string,
+    beforeSequence?: number,
+    limit = 10,
+  ): Promise<GuiEventPage> {
+    return invoke<GuiEventPage>("fetch_cluster_events_from_yaml", {
+      configYaml,
+      beforeSequence,
+      limit,
+    });
+  }
+
   static async saveConnectionYaml(configYaml: string): Promise<StoredClusterConnection> {
     return invoke<StoredClusterConnection>("save_cluster_connection_yaml", { configYaml });
+  }
+
+  static async syncControlPlaneUrls(
+    connectionId: string,
+    controlPlaneUrls: string[],
+  ): Promise<StoredClusterConnection> {
+    return invoke<StoredClusterConnection>("sync_cluster_connection_control_plane_urls", {
+      connectionId,
+      controlPlaneUrls,
+    });
   }
 
   static async listConnectionYamls(): Promise<StoredClusterConnection[]> {

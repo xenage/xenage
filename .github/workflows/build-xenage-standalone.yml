@@ -50,7 +50,11 @@ jobs:
       - name: install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install . pyinstaller
+          python -m pip install . pyinstaller pytest pytest-asyncio
+
+      - name: run python package tests (pre-standalone)
+        run: |
+          python -m pytest -q tests
 
       - name: prepare release version
         id: release_meta
@@ -62,6 +66,25 @@ jobs:
       - name: build standalone artifacts
         run: |
           python scripts/build_standalone.py --version "${{ steps.release_meta.outputs.release_version }}"
+
+      - name: verify standalone binaries (post-build)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          binary_suffix=""
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            binary_suffix=".exe"
+          fi
+
+          control_plane_bin="dist/standalone-build/pyinstaller-dist/xenage-control-plane${binary_suffix}"
+          runtime_bin="dist/standalone-build/pyinstaller-dist/xenage-runtime${binary_suffix}"
+
+          [ -f "${control_plane_bin}" ]
+          [ -f "${runtime_bin}" ]
+
+          "${control_plane_bin}" --help >/dev/null
+          "${runtime_bin}" --help >/dev/null
 
       - name: ensure dev release exists
         id: ensure_dev_release

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import msgspec
-from typing import Literal
+from typing import Annotated, Literal
 
 from ..base import Structure
 from ..common import ObjectMeta
@@ -9,6 +9,7 @@ from .base import ResourceDocument
 
 
 NodeRole = Literal["control-plane", "runtime"]
+NodeSyncPhase = Literal["unknown", "syncing", "synced", "broken"]
 
 
 class NodeRecord(Structure):
@@ -25,6 +26,14 @@ class GroupEndpoint(Structure):
     url: str
 
 
+class GroupNodeSyncStatus(Structure):
+    kind = "GroupNodeSyncStatus"
+    node_id: str
+    status: NodeSyncPhase = "unknown"
+    reason: str = ""
+    updated_at: str = ""
+
+
 class GroupState(Structure):
     kind = "GroupState"
     group_id: str
@@ -36,6 +45,7 @@ class GroupState(Structure):
     runtimes: list[NodeRecord]
     endpoints: list[GroupEndpoint]
     expires_at: str
+    node_statuses: list[GroupNodeSyncStatus] = msgspec.field(default_factory=list)
     leader_signature: str = ""
 
 
@@ -50,6 +60,7 @@ class GroupConfigSpec(Structure):
     runtimes: list[NodeRecord]
     endpoints: list[GroupEndpoint]
     expiresAt: str
+    nodeStatuses: list[GroupNodeSyncStatus] = msgspec.field(default_factory=list)
 
 
 class GroupConfigStatus(Structure):
@@ -124,17 +135,17 @@ class EndpointUpdateRequest(Structure):
     endpoints: list[str]
 
 
-class PublishStateRequest(Structure):
-    kind = "PublishStateRequest"
-    group_state: GroupState
-
-
 class BootstrapTokenRecord(Structure):
     kind = "BootstrapTokenRecord"
     token: str
     issued_at: int
     expires_at: int
     used: bool = False
+
+
+class BootstrapTokenSet(Structure):
+    kind = "BootstrapTokenSet"
+    items: list[BootstrapTokenRecord] = msgspec.field(default_factory=list)
 
 
 class SignedBody(Structure):
@@ -174,9 +185,10 @@ class UserState(Structure):
     event_log: list[EventLogEntry] = msgspec.field(default_factory=list)
 
 
-class UserStatePublishRequest(Structure):
-    kind = "UserStatePublishRequest"
-    user_state: UserState
+class ControlPlaneSyncStatusRequest(Structure):
+    kind = "ControlPlaneSyncStatusRequest"
+    status: Literal["syncing", "synced", "broken"]
+    reason: str = ""
 
 
 class ClusterNodeTableRow(Structure):
@@ -184,8 +196,13 @@ class ClusterNodeTableRow(Structure):
     node_id: str
     role: NodeRole
     leader: bool
-    public_key: str
+    public_key: Annotated[str, "display_only"]
     endpoints: list[str] = msgspec.field(default_factory=list)
+    status: str = ""
+    name: str = ""
+    version: str = ""
+    age: str = ""
+    last_poll_at: str = ""
 
 
 class GroupConfigKeyTableRow(Structure):
@@ -201,8 +218,14 @@ class GuiClusterSnapshot(Structure):
     leader_epoch: int
     nodes: list[ClusterNodeTableRow] = msgspec.field(default_factory=list)
     group_config: list[GroupConfigKeyTableRow] = msgspec.field(default_factory=list)
-    event_log: list[EventLogEntry] = msgspec.field(default_factory=list)
     users: list[UserRecord] = msgspec.field(default_factory=list)
+
+
+class GuiEventPage(Structure):
+    kind = "GuiEventPage"
+    items: list[EventLogEntry] = msgspec.field(default_factory=list)
+    has_more: bool = False
+    next_before_sequence: int = 0
 
 
 class GuiConnectionConfig(Structure):
@@ -212,4 +235,21 @@ class GuiConnectionConfig(Structure):
     user_id: str
     public_key: str
     private_key: str
+    role: Literal["admin"] = "admin"
+
+
+class GuiUserBootstrapRequest(Structure):
+    kind = "GuiUserBootstrapRequest"
+    bootstrap_token: str
+    user_id: str = "admin"
+    public_key: str = ""
+    control_plane_urls: list[str] = msgspec.field(default_factory=list)
+
+
+class GuiUserBootstrapResponse(Structure):
+    kind = "GuiUserBootstrapResponse"
+    cluster_name: str
+    control_plane_urls: list[str]
+    user_id: str
+    public_key: str
     role: Literal["admin"] = "admin"

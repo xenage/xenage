@@ -34,6 +34,19 @@ The Xenage GUI is a cross-platform desktop application built with Tauri and Reac
     yarn tauri build
     ```
 
+4.  **Run tests:**
+
+    ```bash
+    yarn test
+    ```
+
+    Watch mode and coverage:
+
+    ```bash
+    yarn test:watch
+    yarn test:coverage
+    ```
+
 ## CI/CD
 
 We use GitHub Actions to automatically build and package Xenage GUI for Linux, macOS, and Windows on every push to the `main` branch. Artifacts are uploaded to the workflow run and a draft release is created.

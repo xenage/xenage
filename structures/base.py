@@ -20,9 +20,13 @@ class Structure(msgspec.Struct, kw_only=True, omit_defaults=True, frozen=True):
             return bytes(value)
 
         if isinstance(value, str):
-            path = Path(value)
-            if path.exists():
-                return path.read_bytes()
+            try:
+                path = Path(value)
+                if path.exists():
+                    return path.read_bytes()
+            except OSError:
+                # JSON payload strings can be much longer than filesystem path limits.
+                pass
             return value.encode("utf-8")
 
         raise TypeError(f"Unsupported input type for {cls.__name__}: {type(value)!r}")

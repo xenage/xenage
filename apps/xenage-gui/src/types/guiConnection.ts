@@ -4,6 +4,11 @@ export interface ClusterNodeTableRow {
   leader: boolean;
   public_key: string;
   endpoints: string[];
+  status?: string;
+  name?: string;
+  version?: string;
+  age?: string;
+  last_poll_at?: string;
 }
 
 export interface GroupConfigKeyTableRow {
@@ -32,6 +37,11 @@ export interface GuiClusterSnapshot {
   leader_epoch: number;
   nodes: ClusterNodeTableRow[];
   group_config: GroupConfigKeyTableRow[];
-  event_log: EventLogEntry[];
   users: UserRecord[];
+}
+
+export interface GuiEventPage {
+  items: EventLogEntry[];
+  has_more: boolean;
+  next_before_sequence: number;
 }

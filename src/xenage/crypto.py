@@ -55,6 +55,15 @@ def verify_signature(public_key_b64: str, payload: bytes, signature_b64: str) ->
     return True
 
 
+def normalize_public_key_b64(value: str | Ed25519PublicKey | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    public_bytes = value.public_bytes(encoding=RAW_ENCODING, format=RAW_FORMAT_PUBLIC)
+    return base64.b64encode(public_bytes).decode("utf-8")
+
+
 def make_nonce() -> str:
     return secrets.token_hex(16)
 

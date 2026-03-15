@@ -1,20 +1,20 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cluster_connection;
+
 use flate2::read::GzDecoder;
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use ed25519_dalek::{Signer, SigningKey};
-use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 use url::Url;
+
+use cluster_connection::{ClusterUiPrefsEntry, StoredClusterConnection};
 
 const STABLE_UPDATE_ENDPOINT: &str =
     "https://github.com/xenage/xenage/releases/latest/download/latest.json";
@@ -82,30 +82,6 @@ struct StandaloneInstallResult {
 #[derive(Deserialize)]
 struct StandaloneManifest {
     version: String,
-}
-
-#[derive(Deserialize)]
-struct GuiConnectionConfig {
-    cluster_name: String,
-    control_plane_urls: Vec<String>,
-    user_id: String,
-    role: String,
-    public_key: String,
-    private_key: String,
-}
-
-#[derive(Serialize)]
-struct StoredClusterConnection {
-    id: String,
-    name: String,
-    yaml: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct ClusterUiPrefsEntry {
-    connection_id: String,
-    name: String,
-    accent: String,
 }
 
 enum NodeRole {
@@ -270,7 +246,10 @@ fn standalone_asset_name() -> Result<String, String> {
 }
 
 fn standalone_root(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_data = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
     let root = app_data.join("standalone");
     fs::create_dir_all(&root).map_err(|error| error.to_string())?;
     Ok(root)
@@ -318,158 +297,6 @@ fn sha256_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
-}
-
-fn random_nonce_hex() -> Result<String, String> {
-    let mut bytes = [0u8; 16];
-    getrandom(&mut bytes).map_err(|error| format!("failed to generate nonce: {error}"))?;
-    Ok(bytes.iter().map(|value| format!("{value:02x}")).collect::<String>())
-}
-
-fn decode_base64_32(label: &str, value: &str) -> Result<[u8; 32], String> {
-    let bytes = BASE64_STANDARD
-        .decode(value.as_bytes())
-        .map_err(|error| format!("invalid {label}: {error}"))?;
-    bytes
-        .try_into()
-        .map_err(|_| format!("{label} must decode to 32 bytes"))
-}
-
-fn parse_gui_connection_yaml(config_yaml: &str) -> Result<GuiConnectionConfig, String> {
-    let mut fields: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let mut control_plane_urls: Vec<String> = vec![];
-    let mut in_control_plane_urls = false;
-    for line in config_yaml.lines() {
-        let mut compact = line.trim_end().trim_start();
-        if let Some((first_token, rest)) = compact.split_once(' ') {
-            let looks_like_rfc3339 = first_token.len() >= 20
-                && first_token.contains('T')
-                && first_token.ends_with('Z')
-                && first_token
-                    .chars()
-                    .all(|ch| ch.is_ascii_digit() || matches!(ch, '-' | ':' | '.' | 'T' | 'Z'));
-            if looks_like_rfc3339 {
-                compact = rest.trim_start();
-            }
-        }
-        if compact.is_empty() || compact.starts_with('#') {
-            continue;
-        }
-        if compact == "controlPlaneUrls:" || compact == "control_plane_urls:" {
-            in_control_plane_urls = true;
-            continue;
-        }
-        if in_control_plane_urls && compact.starts_with("- ") {
-            control_plane_urls.push(compact.trim_start_matches("- ").trim().to_string());
-            continue;
-        }
-        if in_control_plane_urls && !compact.starts_with("- ") {
-            in_control_plane_urls = false;
-        }
-        let Some((key, value)) = compact.split_once(':') else {
-            continue;
-        };
-        fields.insert(
-            key.trim().to_string(),
-            value.trim().trim_matches('"').trim_matches('\'').to_string(),
-        );
-    }
-
-    let cluster_name = fields
-        .get("clusterName")
-        .or_else(|| fields.get("cluster_name"))
-        .cloned()
-        .unwrap_or_else(|| "demo".to_string());
-    if control_plane_urls.is_empty() {
-        if let Some(single_url) = fields
-            .get("controlPlaneUrl")
-            .or_else(|| fields.get("control_plane_url"))
-            .cloned()
-        {
-            control_plane_urls.push(single_url);
-        }
-    }
-    if control_plane_urls.is_empty() {
-        return Err("missing controlPlaneUrls".to_string());
-    }
-    let user_id = fields
-        .get("id")
-        .or_else(|| fields.get("user_id"))
-        .cloned()
-        .unwrap_or_else(|| "admin".to_string());
-    let role = fields
-        .get("role")
-        .cloned()
-        .unwrap_or_else(|| "admin".to_string());
-    let public_key = fields
-        .get("publicKey")
-        .or_else(|| fields.get("public_key"))
-        .cloned()
-        .ok_or_else(|| "missing publicKey".to_string())?;
-    let private_key = fields
-        .get("privateKey")
-        .or_else(|| fields.get("private_key"))
-        .cloned()
-        .ok_or_else(|| "missing privateKey".to_string())?;
-
-    Ok(GuiConnectionConfig {
-        cluster_name,
-        control_plane_urls,
-        user_id,
-        role,
-        public_key,
-        private_key,
-    })
-}
-
-fn connection_configs_dir() -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("xenage-gui").join("cluster-connections");
-    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
-    Ok(dir)
-}
-
-fn cluster_ui_prefs_path() -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("xenage-gui");
-    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
-    Ok(dir.join("cluster-ui-prefs.json"))
-}
-
-fn normalize_hex_color(value: &str) -> String {
-    let trimmed = value.trim();
-    let valid = trimmed.len() == 7
-        && trimmed.starts_with('#')
-        && trimmed
-            .chars()
-            .skip(1)
-            .all(|ch| ch.is_ascii_hexdigit());
-    if valid {
-        trimmed.to_ascii_lowercase()
-    } else {
-        "#22c55e".to_string()
-    }
-}
-
-fn load_cluster_ui_prefs_file() -> Result<Vec<ClusterUiPrefsEntry>, String> {
-    let path = cluster_ui_prefs_path()?;
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let body = fs::read_to_string(path).map_err(|error| error.to_string())?;
-    serde_json::from_str::<Vec<ClusterUiPrefsEntry>>(&body).map_err(|error| error.to_string())
-}
-
-fn save_cluster_ui_prefs_file(entries: &[ClusterUiPrefsEntry]) -> Result<(), String> {
-    let path = cluster_ui_prefs_path()?;
-    let body = serde_json::to_string_pretty(entries).map_err(|error| error.to_string())?;
-    fs::write(path, body).map_err(|error| error.to_string())
-}
-
-fn safe_slug(value: &str) -> String {
-    let slug: String = value
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_lowercase() } else { '-' })
-        .collect();
-    slug.trim_matches('-').to_string()
 }
 
 fn normalize_archive_path(path: &Path) -> Result<PathBuf, String> {
@@ -538,7 +365,9 @@ fn extract_tar_gz(bytes: &[u8], destination: &Path) -> Result<(), String> {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
 
-        entry.unpack(&output_path).map_err(|error| error.to_string())?;
+        entry
+            .unpack(&output_path)
+            .map_err(|error| error.to_string())?;
     }
 
     Ok(())
@@ -622,7 +451,11 @@ fn current_uid() -> Result<String, String> {
     Ok(output.trim().to_string())
 }
 
-fn install_service_linux(role: &NodeRole, binary: &Path, args: &[String]) -> Result<String, String> {
+fn install_service_linux(
+    role: &NodeRole,
+    binary: &Path,
+    args: &[String],
+) -> Result<String, String> {
     let unit_name = format!("xenage-{}.service", role.service_slug());
     let unit_dir = home_dir()?.join(".config/systemd/user");
     fs::create_dir_all(&unit_dir).map_err(|error| error.to_string())?;
@@ -640,7 +473,10 @@ fn install_service_linux(role: &NodeRole, binary: &Path, args: &[String]) -> Res
     );
     fs::write(&unit_path, content).map_err(|error| error.to_string())?;
 
-    run_command("systemctl", &["--user".to_string(), "daemon-reload".to_string()])?;
+    run_command(
+        "systemctl",
+        &["--user".to_string(), "daemon-reload".to_string()],
+    )?;
     run_command(
         "systemctl",
         &[
@@ -650,7 +486,10 @@ fn install_service_linux(role: &NodeRole, binary: &Path, args: &[String]) -> Res
         ],
     )?;
 
-    Ok(format!("Installed user systemd service: {}", unit_path.display()))
+    Ok(format!(
+        "Installed user systemd service: {}",
+        unit_path.display()
+    ))
 }
 
 fn start_service_linux(role: &NodeRole) -> Result<String, String> {
@@ -715,7 +554,11 @@ fn launchctl_target(role: &NodeRole) -> Result<String, String> {
     Ok(format!("gui/{uid}/com.xenage.{}", role.service_slug()))
 }
 
-fn install_service_macos(role: &NodeRole, binary: &Path, args: &[String]) -> Result<String, String> {
+fn install_service_macos(
+    role: &NodeRole,
+    binary: &Path,
+    args: &[String],
+) -> Result<String, String> {
     let plist = plist_path(role)?;
     if let Some(parent) = plist.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -755,7 +598,10 @@ fn install_service_macos(role: &NodeRole, binary: &Path, args: &[String]) -> Res
         ],
     )?;
 
-    Ok(format!("Installed launchd agent: {} ({target})", plist.display()))
+    Ok(format!(
+        "Installed launchd agent: {} ({target})",
+        plist.display()
+    ))
 }
 
 fn start_service_macos(role: &NodeRole) -> Result<String, String> {
@@ -822,7 +668,11 @@ fn windows_service_name(role: &NodeRole) -> String {
     format!("Xenage{}", role.service_title().replace(' ', ""))
 }
 
-fn install_service_windows(role: &NodeRole, binary: &Path, args: &[String]) -> Result<String, String> {
+fn install_service_windows(
+    role: &NodeRole,
+    binary: &Path,
+    args: &[String],
+) -> Result<String, String> {
     let service_name = windows_service_name(role);
     let mut binary_command = format!("\"{}\"", binary.display());
     for arg in args {
@@ -836,20 +686,8 @@ fn install_service_windows(role: &NodeRole, binary: &Path, args: &[String]) -> R
         }
     }
 
-    run_command_allow_failure(
-        "sc.exe",
-        &[
-            "stop".to_string(),
-            service_name.clone(),
-        ],
-    );
-    run_command_allow_failure(
-        "sc.exe",
-        &[
-            "delete".to_string(),
-            service_name.clone(),
-        ],
-    );
+    run_command_allow_failure("sc.exe", &["stop".to_string(), service_name.clone()]);
+    run_command_allow_failure("sc.exe", &["delete".to_string(), service_name.clone()]);
 
     run_command(
         "sc.exe",
@@ -911,7 +749,11 @@ fn service_status_windows(role: &NodeRole) -> ServiceStatus {
     }
 }
 
-fn install_service_for_role(app: &AppHandle, role: &NodeRole, args: &[String]) -> Result<String, String> {
+fn install_service_for_role(
+    app: &AppHandle,
+    role: &NodeRole,
+    args: &[String],
+) -> Result<String, String> {
     if args.is_empty() {
         return Err(format!(
             "No command arguments were provided for {}",
@@ -963,6 +805,81 @@ fn read_manifest_version(app: &AppHandle) -> Option<String> {
     Some(manifest.version)
 }
 
+fn sanitize_tab_id_for_window_label(tab_id: &str) -> String {
+    let sanitized: String = tab_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    if sanitized.is_empty() {
+        "tab".to_string()
+    } else {
+        sanitized
+    }
+}
+
+#[tauri::command]
+async fn open_detached_tab_window(
+    app: AppHandle,
+    source_url: String,
+    tab_id: String,
+    tab_kind: String,
+    cluster_id: String,
+    tab_label: String,
+    cluster_label: String,
+) -> Result<String, String> {
+    let mut popup_url =
+        Url::parse(&source_url).map_err(|error| format!("invalid source URL: {error}"))?;
+
+    let filtered_pairs: Vec<(String, String)> = popup_url
+        .query_pairs()
+        .into_owned()
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "tabPopout" | "tabKind" | "clusterId" | "tabId"
+            )
+        })
+        .collect();
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    for (key, value) in filtered_pairs {
+        query.append_pair(&key, &value);
+    }
+    query.append_pair("tabPopout", "1");
+    query.append_pair("tabKind", &tab_kind);
+    query.append_pair("clusterId", &cluster_id);
+    query.append_pair("tabId", &tab_id);
+    let encoded_query = query.finish();
+    popup_url.set_query(Some(&encoded_query));
+
+    let safe_tab_id = sanitize_tab_id_for_window_label(&tab_id);
+    let epoch_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis();
+    let label = format!("xenage-{safe_tab_id}-{epoch_ms}");
+    let title = if cluster_label.trim().is_empty() {
+        tab_label
+    } else {
+        format!("{tab_label} · {cluster_label}")
+    };
+
+    WebviewWindowBuilder::new(&app, label.clone(), WebviewUrl::External(popup_url))
+        .title(title)
+        .inner_size(1440.0, 920.0)
+        .min_inner_size(900.0, 620.0)
+        .center()
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    Ok(label)
+}
+
 #[tauri::command]
 async fn check_for_updates(
     app: AppHandle,
@@ -1003,7 +920,10 @@ async fn install_update(
                 channel: channel.clone(),
                 endpoint: endpoint.clone(),
                 step: "download-started".into(),
-                message: format!("Downloading update {} for target {}", update.version, update.target),
+                message: format!(
+                    "Downloading update {} for target {}",
+                    update.version, update.target
+                ),
                 force,
                 current_version: Some(update.current_version.clone()),
                 version: Some(update.version.clone()),
@@ -1253,122 +1173,48 @@ async fn standalone_status(app: AppHandle) -> Result<StandaloneStatus, String> {
 }
 
 #[tauri::command]
-async fn fetch_cluster_snapshot_from_yaml(config_yaml: String) -> Result<serde_json::Value, String> {
-    let config = parse_gui_connection_yaml(&config_yaml)?;
-    if config.role != "admin" {
-        return Err("only admin role is supported".to_string());
-    }
-
-    let private_key_bytes = decode_base64_32("private key", &config.private_key)?;
-    let public_key_bytes = decode_base64_32("public key", &config.public_key)?;
-    let signing_key = SigningKey::from_bytes(&private_key_bytes);
-    if signing_key.verifying_key().to_bytes() != public_key_bytes {
-        return Err("public key does not match private key".to_string());
-    }
-
-    let path = "/v1/gui/cluster";
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| error.to_string())?
-        .as_secs() as i64;
-    let nonce = random_nonce_hex()?;
-    let payload = format!(
-        "GET\n{}\n{}\n{}\n{}",
-        path,
-        timestamp,
-        nonce,
-        sha256_bytes(&[])
-    );
-    let signature = signing_key.sign(payload.as_bytes());
-    let signature_b64 = BASE64_STANDARD.encode(signature.to_bytes());
-
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .build()
-        .map_err(|error| error.to_string())?;
-    let mut errors: Vec<String> = vec![];
-    for base in &config.control_plane_urls {
-        let url = format!("{}{}", base.trim_end_matches('/'), path);
-        let response = match client
-            .get(&url)
-            .header("x-node-id", &config.user_id)
-            .header("x-timestamp", timestamp.to_string())
-            .header("x-nonce", &nonce)
-            .header("x-signature", &signature_b64)
-            .header("x-public-key", &config.public_key)
-            .send()
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => {
-                errors.push(format!("{url}: {error}"));
-                continue;
-            }
-        };
-        let status = response.status();
-        let body = response.text().await.map_err(|error| error.to_string())?;
-        if status.is_success() {
-            return serde_json::from_str(&body)
-                .map_err(|error| format!("invalid control-plane response: {error}"));
-        }
-        errors.push(format!("{url}: control-plane rejected request ({status}): {body}"));
-    }
-    Err(errors.join(" | "))
+async fn fetch_cluster_snapshot_from_yaml(
+    config_yaml: String,
+) -> Result<serde_json::Value, String> {
+    cluster_connection::fetch_cluster_snapshot_from_yaml(config_yaml).await
 }
 
 #[tauri::command]
-async fn save_cluster_connection_yaml(config_yaml: String) -> Result<StoredClusterConnection, String> {
-    let config = parse_gui_connection_yaml(&config_yaml)?;
-    let dir = connection_configs_dir()?;
-    let base_name = format!("{}-{}", safe_slug(&config.cluster_name), safe_slug(&config.user_id));
-    let hash = &sha256_bytes(config_yaml.as_bytes())[0..10];
-    let file_name = format!("{base_name}-{hash}.yaml");
-    let path = dir.join(file_name);
-    fs::write(&path, config_yaml).map_err(|error| error.to_string())?;
-    Ok(StoredClusterConnection {
-        id: path
-            .file_stem()
-            .and_then(|item| item.to_str())
-            .unwrap_or("connection")
-            .to_string(),
-        name: config.cluster_name,
-        yaml: fs::read_to_string(path).map_err(|error| error.to_string())?,
-    })
+async fn fetch_cluster_events_from_yaml(
+    config_yaml: String,
+    before_sequence: Option<i64>,
+    limit: Option<i64>,
+) -> Result<serde_json::Value, String> {
+    cluster_connection::fetch_cluster_events_from_yaml(config_yaml, before_sequence, limit).await
+}
+
+#[tauri::command]
+async fn sync_cluster_connection_control_plane_urls(
+    connection_id: String,
+    control_plane_urls: Vec<String>,
+) -> Result<StoredClusterConnection, String> {
+    cluster_connection::sync_cluster_connection_control_plane_urls(
+        connection_id,
+        control_plane_urls,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn save_cluster_connection_yaml(
+    config_yaml: String,
+) -> Result<StoredClusterConnection, String> {
+    cluster_connection::save_cluster_connection_yaml(config_yaml).await
 }
 
 #[tauri::command]
 async fn list_cluster_connection_yamls() -> Result<Vec<StoredClusterConnection>, String> {
-    let dir = connection_configs_dir()?;
-    let mut output: Vec<StoredClusterConnection> = vec![];
-    let entries = fs::read_dir(dir).map_err(|error| error.to_string())?;
-    for entry_result in entries {
-        let entry = entry_result.map_err(|error| error.to_string())?;
-        let path = entry.path();
-        if path.extension().and_then(|item| item.to_str()) != Some("yaml") {
-            continue;
-        }
-        let yaml = fs::read_to_string(&path).map_err(|error| error.to_string())?;
-        let config = match parse_gui_connection_yaml(&yaml) {
-            Ok(value) => value,
-            Err(_) => continue,
-        };
-        output.push(StoredClusterConnection {
-            id: path
-                .file_stem()
-                .and_then(|item| item.to_str())
-                .unwrap_or("connection")
-                .to_string(),
-            name: config.cluster_name,
-            yaml,
-        });
-    }
-    output.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
-    Ok(output)
+    cluster_connection::list_cluster_connection_yamls().await
 }
 
 #[tauri::command]
 async fn list_cluster_ui_prefs() -> Result<Vec<ClusterUiPrefsEntry>, String> {
-    load_cluster_ui_prefs_file()
+    cluster_connection::list_cluster_ui_prefs().await
 }
 
 #[tauri::command]
@@ -1377,57 +1223,12 @@ async fn save_cluster_ui_prefs_entry(
     name: String,
     accent: String,
 ) -> Result<ClusterUiPrefsEntry, String> {
-    let mut entries = load_cluster_ui_prefs_file()?;
-    let normalized = ClusterUiPrefsEntry {
-        connection_id: connection_id.clone(),
-        name: name.trim().to_string(),
-        accent: normalize_hex_color(&accent),
-    };
-
-    if let Some(existing) = entries
-        .iter_mut()
-        .find(|entry| entry.connection_id == connection_id)
-    {
-        *existing = normalized.clone();
-    } else {
-        entries.push(normalized.clone());
-    }
-
-    entries.sort_by(|a, b| a.connection_id.cmp(&b.connection_id));
-    save_cluster_ui_prefs_file(&entries)?;
-    Ok(normalized)
+    cluster_connection::save_cluster_ui_prefs_entry(connection_id, name, accent).await
 }
 
 #[tauri::command]
 async fn delete_cluster_connection(connection_id: String) -> Result<(), String> {
-    let dir = connection_configs_dir()?;
-    let mut removed = false;
-    let entries = fs::read_dir(&dir).map_err(|error| error.to_string())?;
-    for entry_result in entries {
-        let entry = entry_result.map_err(|error| error.to_string())?;
-        let path = entry.path();
-        if path.extension().and_then(|item| item.to_str()) != Some("yaml") {
-            continue;
-        }
-        let stem = path
-            .file_stem()
-            .and_then(|item| item.to_str())
-            .unwrap_or_default();
-        if stem == connection_id {
-            fs::remove_file(&path).map_err(|error| error.to_string())?;
-            removed = true;
-            break;
-        }
-    }
-
-    if !removed {
-        return Err(format!("Cluster connection not found: {connection_id}"));
-    }
-
-    let mut ui_entries = load_cluster_ui_prefs_file()?;
-    ui_entries.retain(|entry| entry.connection_id != connection_id);
-    save_cluster_ui_prefs_file(&ui_entries)?;
-    Ok(())
+    cluster_connection::delete_cluster_connection(connection_id).await
 }
 
 fn main() {
@@ -1436,6 +1237,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            open_detached_tab_window,
             check_for_updates,
             install_update,
             install_standalone_bundle,
@@ -1444,6 +1246,8 @@ fn main() {
             stop_node_service,
             standalone_status,
             fetch_cluster_snapshot_from_yaml,
+            fetch_cluster_events_from_yaml,
+            sync_cluster_connection_control_plane_urls,
             save_cluster_connection_yaml,
             list_cluster_connection_yamls,
             list_cluster_ui_prefs,

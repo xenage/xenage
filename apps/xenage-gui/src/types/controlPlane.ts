@@ -26,6 +26,34 @@ export interface ManifestResource {
   sample: ManifestSample;
 }
 
+export interface ManifestSort {
+  field: string;
+  direction: "asc" | "desc";
+}
+
+export interface ManifestTableColumn {
+  key: string;
+  label: string;
+  path: string;
+  type: string;
+  isArray: boolean;
+  width: number;
+  minWidth: number;
+  displayOnly: boolean;
+}
+
+export interface ManifestTable {
+  kind: string;
+  title: string;
+  source: string;
+  rowKind: string;
+  rowKey: string;
+  defaultSort: ManifestSort;
+  pageSize?: number | null;
+  columns: ManifestTableColumn[];
+  sample: Record<string, unknown>;
+}
+
 export interface NavigationLeaf {
   label: string;
   kind: string;
@@ -46,4 +74,5 @@ export interface ControlPlaneManifest {
   };
   navigation: NavigationNode;
   resources: ManifestResource[];
+  tables: ManifestTable[];
 }

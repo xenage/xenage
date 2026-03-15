@@ -11,3 +11,10 @@
 - Isolated execution environments
 - Built-in agent scheduler
 - Event-driven agent architecture
+- High Availability friendly
+
+## Documentation
+
+- Main docs index: [docs/README.md](docs/README.md)
+- Structure model reference: [docs/structures/README.md](docs/structures/README.md)
+
