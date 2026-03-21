@@ -175,9 +175,13 @@ jobs:
           files=()
           while IFS= read -r -d '' file; do
             files+=("${file}")
-          done < <(find dist/standalone-release -maxdepth 1 -type f -print0)
+          done < <(find dist/standalone-release -type f -print0)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No files found in dist/standalone-release to upload" >&2
             exit 1
           fi
+          printf 'Standalone release files to upload:\n'
+          for file in "${files[@]}"; do
+            printf ' - %s\n' "${file}"
+          done
           gh release upload "${RELEASE_TAG}" "${files[@]}" --repo "${REPO}"
