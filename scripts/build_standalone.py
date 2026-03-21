@@ -2,17 +2,13 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import os
 import platform
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-import zipfile
 
 
 @dataclass(frozen=True)
@@ -41,14 +37,6 @@ def platform_triplet() -> tuple[str, str]:
     }
     arch = arch_aliases.get(machine, machine)
     return platform_name, arch
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def run_pyinstaller(target: TargetBinary, build_root: Path, dist_root: Path) -> Path:
@@ -81,41 +69,46 @@ def run_pyinstaller(target: TargetBinary, build_root: Path, dist_root: Path) -> 
     return artifact
 
 
-def package_release(
+def normalize_labels(platform_name: str, arch: str) -> tuple[str, str]:
+    if platform_name == "windows":
+        os_label = "win"
+    elif platform_name == "macos":
+        os_label = "mac"
+    else:
+        os_label = "linux"
+
+    arch_label = arch
+    if arch == "x86_64":
+        arch_label = "x86"
+    elif arch == "aarch64":
+        arch_label = "aarch"
+    return os_label, arch_label
+
+
+def export_direct_binaries(
     binaries: list[Path],
     output_dir: Path,
-    release_name: str,
     version: str,
     platform_name: str,
     arch: str,
-) -> tuple[Path, Path]:
-    staging = output_dir / "staging"
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir(parents=True, exist_ok=True)
-
-    manifest = {
-        "version": version,
-        "platform": platform_name,
-        "arch": arch,
-        "binaries": [path.name for path in binaries],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+) -> list[Path]:
+    os_label, arch_label = normalize_labels(platform_name, arch)
+    exported: list[Path] = []
 
     for binary in binaries:
-        shutil.copy2(binary, staging / binary.name)
+        binary_name = binary.name
+        kind = "binary"
+        if "control-plane" in binary_name:
+            kind = "control_plane"
+        elif "runtime" in binary_name:
+            kind = "runtime"
 
-    manifest_path = staging / "standalone-manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    archive = output_dir / release_name
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for item in sorted(staging.iterdir()):
-            zf.write(item, arcname=item.name)
-
-    checksum_path = output_dir / f"{release_name}.sha256"
-    checksum_path.write_text(f"{sha256_file(archive)}  {archive.name}\n", encoding="utf-8")
-    return archive, checksum_path
+        ext = binary.suffix
+        target_name = f"{os_label}_{arch_label}_xenage_{kind}_{version}{ext}"
+        target_path = output_dir / target_name
+        shutil.copy2(binary, target_path)
+        exported.append(target_path)
+    return exported
 
 
 def main() -> None:
@@ -152,23 +145,15 @@ def main() -> None:
 
     built_binaries = [run_pyinstaller(target, build_dir, pyinstaller_dist) for target in targets]
     platform_name, arch = platform_triplet()
-    arch_label = arch
-    if arch == "x86_64":
-        arch_label = "x86"
-    elif arch == "aarch64":
-        arch_label = "arm" if platform_name == "linux" else "aarch"
-    archive_name = f"{platform_name}_{arch_label}_xenage_standalone_{args.version}.zip"
-    archive, checksum = package_release(
+    outputs = export_direct_binaries(
         binaries=built_binaries,
         output_dir=output_dir,
-        release_name=archive_name,
         version=args.version,
         platform_name=platform_name,
         arch=arch,
     )
-
-    print(f"Built standalone archive: {archive}")
-    print(f"Checksum: {checksum}")
+    for output in outputs:
+        print(f"Built standalone artifact: {output}")
 
 
 if __name__ == "__main__":

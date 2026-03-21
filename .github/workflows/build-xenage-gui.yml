@@ -13,7 +13,7 @@ jobs:
       contents: write
       actions: write
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - platform: macos-latest
@@ -107,10 +107,7 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/dmg/*.dmg
             apps/xenage-gui/src-tauri/target/release/bundle/deb/*.deb
             apps/xenage-gui/src-tauri/target/release/bundle/appimage/*.AppImage
-            apps/xenage-gui/src-tauri/target/release/bundle/**/*.tar.gz
             apps/xenage-gui/src-tauri/target/release/bundle/**/*.zip
-            apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
-            apps/xenage-gui/src-tauri/target/release/*.sig
 
       - name: Save Tauri build cache
         if: success() && github.event_name != 'pull_request'
