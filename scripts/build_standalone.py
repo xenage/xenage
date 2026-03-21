@@ -9,7 +9,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tarfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +21,7 @@ class TargetBinary:
     entrypoint: Path
 
 
-def platform_triplet() -> tuple[str, str, str]:
+def platform_triplet() -> tuple[str, str]:
     os_name = sys.platform
     if os_name.startswith("linux"):
         platform_name = "linux"
@@ -41,8 +40,7 @@ def platform_triplet() -> tuple[str, str, str]:
         "armv8": "aarch64",
     }
     arch = arch_aliases.get(machine, machine)
-    extension = "zip" if platform_name == "windows" else "tar.gz"
-    return platform_name, arch, extension
+    return platform_name, arch
 
 
 def sha256_file(path: Path) -> str:
@@ -87,7 +85,6 @@ def package_release(
     binaries: list[Path],
     output_dir: Path,
     release_name: str,
-    extension: str,
     version: str,
     platform_name: str,
     arch: str,
@@ -112,14 +109,9 @@ def package_release(
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     archive = output_dir / release_name
-    if extension == "zip":
-        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for item in sorted(staging.iterdir()):
-                zf.write(item, arcname=item.name)
-    else:
-        with tarfile.open(archive, "w:gz") as tf:
-            for item in sorted(staging.iterdir()):
-                tf.add(item, arcname=item.name)
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for item in sorted(staging.iterdir()):
+            zf.write(item, arcname=item.name)
 
     checksum_path = output_dir / f"{release_name}.sha256"
     checksum_path.write_text(f"{sha256_file(archive)}  {archive.name}\n", encoding="utf-8")
@@ -159,13 +151,17 @@ def main() -> None:
     ]
 
     built_binaries = [run_pyinstaller(target, build_dir, pyinstaller_dist) for target in targets]
-    platform_name, arch, extension = platform_triplet()
-    archive_name = f"xenage-standalone-{platform_name}-{arch}.{extension}"
+    platform_name, arch = platform_triplet()
+    arch_label = arch
+    if arch == "x86_64":
+        arch_label = "x86"
+    elif arch == "aarch64":
+        arch_label = "arm" if platform_name == "linux" else "aarch"
+    archive_name = f"{platform_name}_{arch_label}_xenage_standalone_{args.version}.zip"
     archive, checksum = package_release(
         binaries=built_binaries,
         output_dir=output_dir,
         release_name=archive_name,
-        extension=extension,
         version=args.version,
         platform_name=platform_name,
         arch=arch,

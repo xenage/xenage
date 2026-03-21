@@ -150,20 +150,26 @@ jobs:
           RELEASE_BODY: Automated release from GitHub Actions
         shell: bash
         run: |
-          prerelease_flag=""
           if [ "${GITHUB_REF}" = "refs/heads/dev" ]; then
-            prerelease_flag="--prerelease"
-          fi
-
-          if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-            gh release edit "${RELEASE_TAG}" --repo "${REPO}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}" ${prerelease_flag}
-          else
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release delete "${RELEASE_TAG}" --repo "${REPO}" --yes --cleanup-tag
+            fi
             gh release create "${RELEASE_TAG}" \
               --repo "${REPO}" \
               --target "${GITHUB_SHA}" \
               --title "${RELEASE_NAME}" \
               --notes "${RELEASE_BODY}" \
-              ${prerelease_flag}
+              --prerelease
+          else
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release edit "${RELEASE_TAG}" --repo "${REPO}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}"
+            else
+              gh release create "${RELEASE_TAG}" \
+                --repo "${REPO}" \
+                --target "${GITHUB_SHA}" \
+                --title "${RELEASE_NAME}" \
+                --notes "${RELEASE_BODY}"
+            fi
           fi
 
       - name: download build artifacts
@@ -172,8 +178,7 @@ jobs:
           pattern: ${{ github.ref == 'refs/heads/dev' && 'xenage-gui-dev-*' || 'xenage-gui-*' }}
           path: dist/gui-release
 
-      - name: clear existing dev release assets
-        if: github.ref == 'refs/heads/dev'
+      - name: clear existing release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -190,6 +195,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
         shell: bash
         run: |
           files=()
@@ -201,33 +207,34 @@ jobs:
             exit 1
           fi
 
-          declare -A name_counts
           for file in "${files[@]}"; do
+            rel="${file#dist/gui-release/}"
+            artifact_dir="${rel%%/*}"
             base="$(basename "${file}")"
-            current_count="${name_counts["${base}"]:-0}"
-            name_counts["${base}"]=$((current_count + 1))
-          done
 
-          release_json="$(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets)"
+            artifact_suffix="${artifact_dir#xenage-gui-dev-}"
+            if [ "${artifact_suffix}" = "${artifact_dir}" ]; then
+              artifact_suffix="${artifact_dir#xenage-gui-}"
+            fi
+            os="${artifact_suffix%-*}"
+            arch="${artifact_suffix##*-}"
 
-          for file in "${files[@]}"; do
-            base="$(basename "${file}")"
-            upload_path="${file}"
-
-            if [ "${name_counts["${base}"]}" -gt 1 ]; then
-              rel="${file#dist/gui-release/}"
-              artifact_dir="${rel%%/*}"
-              unique_name="${artifact_dir}__${base}"
-              temp_path="/tmp/${unique_name}"
-              cp "${file}" "${temp_path}"
-              upload_path="${temp_path}"
-              base="${unique_name}"
+            os_label="${os}"
+            if [ "${os}" = "macos" ]; then
+              os_label="mac"
+            elif [ "${os}" = "windows" ]; then
+              os_label="win"
             fi
 
-            existing_id="$(printf '%s' "${release_json}" | jq -r --arg name "${base}" '.assets[] | select(.name == $name) | .id' | head -n 1)"
-            if [ -n "${existing_id}" ] && [ "${existing_id}" != "null" ]; then
-              gh api --method DELETE "repos/${REPO}/releases/assets/${existing_id}"
+            arch_label="${arch}"
+            if [ "${arch}" = "x86_64" ]; then
+              arch_label="x86"
+            elif [ "${arch}" = "aarch64" ]; then
+              arch_label="aarch"
             fi
 
-            gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
+            sanitized_base="${base// /_}"
+            upload_name="${os_label}_${arch_label}_Xenage_GUI_${RELEASE_VERSION}_${sanitized_base}"
+
+            gh release upload "${RELEASE_TAG}" "${file}#${upload_name}" --repo "${REPO}"
           done

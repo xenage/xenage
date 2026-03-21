@@ -124,20 +124,26 @@ jobs:
           RELEASE_BODY: Automated standalone release from GitHub Actions
         shell: bash
         run: |
-          prerelease_flag=""
           if [ "${GITHUB_REF}" = "refs/heads/dev" ]; then
-            prerelease_flag="--prerelease"
-          fi
-
-          if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-            gh release edit "${RELEASE_TAG}" --repo "${REPO}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}" ${prerelease_flag}
-          else
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release delete "${RELEASE_TAG}" --repo "${REPO}" --yes --cleanup-tag
+            fi
             gh release create "${RELEASE_TAG}" \
               --repo "${REPO}" \
               --target "${GITHUB_SHA}" \
               --title "${RELEASE_NAME}" \
               --notes "${RELEASE_BODY}" \
-              ${prerelease_flag}
+              --prerelease
+          else
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release edit "${RELEASE_TAG}" --repo "${REPO}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}"
+            else
+              gh release create "${RELEASE_TAG}" \
+                --repo "${REPO}" \
+                --target "${GITHUB_SHA}" \
+                --title "${RELEASE_NAME}" \
+                --notes "${RELEASE_BODY}"
+            fi
           fi
 
       - name: download build artifacts
@@ -146,6 +152,18 @@ jobs:
           pattern: xenage-standalone-*
           merge-multiple: true
           path: dist/standalone-release
+
+      - name: clear existing release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          while IFS= read -r asset_id; do
+            [ -n "${asset_id}" ] || continue
+            gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}"
+          done < <(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}/assets" --paginate --jq '.[].id')
 
       - name: upload release assets
         env:
@@ -162,4 +180,4 @@ jobs:
             echo "No files found in dist/standalone-release to upload" >&2
             exit 1
           fi
-          gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber --repo "${REPO}"
+          gh release upload "${RELEASE_TAG}" "${files[@]}" --repo "${REPO}"
