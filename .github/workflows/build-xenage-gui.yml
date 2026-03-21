@@ -11,6 +11,7 @@ jobs:
   build:
     permissions:
       contents: write
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -55,9 +56,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             apps/xenage-gui/src-tauri/target
-          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('apps/xenage-gui/src-tauri/Cargo.lock', 'apps/xenage-gui/src-tauri/Cargo.toml') }}
-          restore-keys: |
-            xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -114,14 +113,25 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/*.sig
 
       - name: Save Tauri build cache
-        if: success()
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          cache_key="xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest"
+          while IFS= read -r cache_id; do
+            [ -n "${cache_id}" ] || continue
+            gh api --method DELETE "repos/${{ github.repository }}/actions/caches/${cache_id}" || true
+          done < <(gh api "repos/${{ github.repository }}/actions/caches?key=${cache_key}" --jq '.actions_caches[].id')
+      - name: Save Tauri build cache blob
+        if: success() && github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             apps/xenage-gui/src-tauri/target
-          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest
 
   publish_release:
     if: github.event_name != 'pull_request'
@@ -235,6 +245,7 @@ jobs:
 
             sanitized_base="${base// /_}"
             upload_name="${os_label}_${arch_label}_Xenage_GUI_${RELEASE_VERSION}_${sanitized_base}"
-
-            gh release upload "${RELEASE_TAG}" "${file}#${upload_name}" --repo "${REPO}"
+            upload_path="/tmp/${upload_name}"
+            cp "${file}" "${upload_path}"
+            gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
           done
