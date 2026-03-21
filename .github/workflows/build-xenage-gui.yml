@@ -2,9 +2,9 @@ name: Build Xenage GUI
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: ["main", "dev"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -41,11 +41,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'yarn'
+          cache: "yarn"
           cache-dependency-path: apps/xenage-gui/yarn.lock
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: pip install -e .
 
       - name: install dependencies (linux only)
         if: matrix.os == 'linux'
