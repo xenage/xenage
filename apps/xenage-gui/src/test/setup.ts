@@ -49,11 +49,7 @@ vi.mock("overlayscrollbars-react", () => {
       [],
     );
 
-    return (
-      <div ref={containerRef} {...rest}>
-        {children}
-      </div>
-    );
+    return React.createElement("div", { ...rest, ref: containerRef }, children);
   });
 
   return { OverlayScrollbarsComponent };
