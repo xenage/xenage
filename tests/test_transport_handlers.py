@@ -14,13 +14,21 @@ from xenage.network.http_transport import NodeHTTPServer, TransportError
 from xenage.nodes.control_plane import ControlPlaneNode
 from xenage.nodes.runtime import RuntimeNode
 
+_RESERVED_PORTS: set[int] = set()
+_PORT_LOCK = threading.Lock()
+
 
 def free_port() -> int:
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
+    while True:
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        with _PORT_LOCK:
+            if port in _RESERVED_PORTS:
+                continue
+            _RESERVED_PORTS.add(port)
+            return port
 
 
 def test_runtime_joins_leader_over_http(tmp_path: Path) -> None:

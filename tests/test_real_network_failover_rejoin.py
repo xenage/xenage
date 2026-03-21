@@ -15,13 +15,21 @@ from xenage.nodes.control_plane import ControlPlaneNode
 from xenage.nodes.runtime import RuntimeNode
 from xenage.serialization import encode_value
 
+_RESERVED_PORTS: set[int] = set()
+_PORT_LOCK = threading.Lock()
+
 
 def free_port() -> int:
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
+    while True:
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        with _PORT_LOCK:
+            if port in _RESERVED_PORTS:
+                continue
+            _RESERVED_PORTS.add(port)
+            return port
 
 
 def start_server(node: ControlPlaneNode, port: int) -> tuple[NodeHTTPServer, threading.Thread]:
