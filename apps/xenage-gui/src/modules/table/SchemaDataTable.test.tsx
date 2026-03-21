@@ -22,7 +22,7 @@ describe("SchemaDataTable row selection", () => {
   it("selects a visible range when shift-clicking row checkboxes", () => {
     render(<SchemaDataTable columns={columns} rows={rows} />);
 
-    const [row1, row2, row3, row4] = getRowCheckboxes();
+    const [row1, , row3] = getRowCheckboxes();
     fireEvent.click(row1);
     fireEvent.mouseDown(row3, { shiftKey: true });
     fireEvent.mouseUp(row3, { shiftKey: true });
@@ -38,7 +38,7 @@ describe("SchemaDataTable row selection", () => {
   it("keeps single-row behavior when shift is not pressed", () => {
     render(<SchemaDataTable columns={columns} rows={rows} />);
 
-    const [row1, row2, row3] = getRowCheckboxes();
+    const [row1, , row3] = getRowCheckboxes();
     fireEvent.click(row1);
     fireEvent.click(row3);
 

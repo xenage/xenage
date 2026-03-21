@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export interface DetachedTabWindowRequest {
+export interface DetachedTabWindowRequest extends Record<string, unknown> {
   sourceUrl: string;
   tabId: string;
   tabKind: string;
