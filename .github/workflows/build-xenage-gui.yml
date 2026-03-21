@@ -170,7 +170,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ github.ref == 'refs/heads/dev' && 'xenage-gui-dev-*' || 'xenage-gui-*' }}
-          merge-multiple: true
           path: dist/gui-release
 
       - name: upload release assets
@@ -188,4 +187,34 @@ jobs:
             echo "No files found in dist/gui-release to upload" >&2
             exit 1
           fi
-          gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber --repo "${REPO}"
+
+          declare -A name_counts
+          for file in "${files[@]}"; do
+            base="$(basename "${file}")"
+            current_count="${name_counts["${base}"]:-0}"
+            name_counts["${base}"]=$((current_count + 1))
+          done
+
+          release_json="$(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets)"
+
+          for file in "${files[@]}"; do
+            base="$(basename "${file}")"
+            upload_path="${file}"
+
+            if [ "${name_counts["${base}"]}" -gt 1 ]; then
+              rel="${file#dist/gui-release/}"
+              artifact_dir="${rel%%/*}"
+              unique_name="${artifact_dir}__${base}"
+              temp_path="/tmp/${unique_name}"
+              cp "${file}" "${temp_path}"
+              upload_path="${temp_path}"
+              base="${unique_name}"
+            fi
+
+            existing_id="$(printf '%s' "${release_json}" | jq -r --arg name "${base}" '.assets[] | select(.name == $name) | .id' | head -n 1)"
+            if [ -n "${existing_id}" ] && [ "${existing_id}" != "null" ]; then
+              gh api --method DELETE "repos/${REPO}/releases/assets/${existing_id}"
+            fi
+
+            gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
+          done
