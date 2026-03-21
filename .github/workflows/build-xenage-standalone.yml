@@ -159,7 +159,12 @@ jobs:
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
         shell: bash
         run: |
-          gh release upload "${RELEASE_TAG}" dist/standalone-release/* --clobber
+          mapfile -d '' files < <(find dist/standalone-release -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No files found in dist/standalone-release to upload" >&2
+            exit 1
+          fi
+          gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
