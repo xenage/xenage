@@ -19,8 +19,7 @@ lerna-debug.log*
 # Rust / Tauri
 **/src-tauri/target/
 **/src-tauri/Cargo.lock
-# We usually commit Cargo.lock for binary apps, but the user asked for .gitignore dependencies.
-# Given it's a monorepo, some people ignore lock files at root, but I'll keep it simple.
+!apps/xenage-gui/src-tauri/Cargo.lock
 
 # Python
 __pycache__/
