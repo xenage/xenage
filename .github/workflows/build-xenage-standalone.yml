@@ -159,7 +159,10 @@ jobs:
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
         shell: bash
         run: |
-          mapfile -d '' files < <(find dist/standalone-release -type f -print0)
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("${file}")
+          done < <(find dist/standalone-release -type f -print0)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No files found in dist/standalone-release to upload" >&2
             exit 1

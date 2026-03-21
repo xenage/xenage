@@ -48,6 +48,18 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Restore Tauri build cache
+        id: tauri_cache_restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/xenage-gui/src-tauri/target
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('apps/xenage-gui/src-tauri/Cargo.lock', 'apps/xenage-gui/src-tauri/Cargo.toml') }}
+          restore-keys: |
+            xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -152,3 +164,13 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/**/*.zip
             apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
             apps/xenage-gui/src-tauri/target/release/*.sig
+
+      - name: Save Tauri build cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/xenage-gui/src-tauri/target
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
