@@ -191,7 +191,7 @@ export default function InstallSection() {
                 flex: 1,
               }}
             >
-              curl https://xenage.dev | bash
+              curl https://xenage.dev | sh
             </code>
           </div>
         </div>

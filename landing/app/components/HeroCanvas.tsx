@@ -9,9 +9,9 @@ interface HeroCanvasProps {
 
 const complexityBySection = [1, 1, 2, 2, 3, 4, 5, 6];
 
-function createMobiusGeometry(detail: number): THREE.BufferGeometry {
-  const segmentsU = 28 + detail * 16;
-  const segmentsV = 100 + detail * 52;
+function createMobiusGeometry(detail: number, geometry?: THREE.BufferGeometry): THREE.BufferGeometry {
+  const segmentsU = 124;
+  const segmentsV = 412;
   const width = 0.34 + detail * 0.02;
   const radius = 1.45;
 
@@ -32,6 +32,14 @@ function createMobiusGeometry(detail: number): THREE.BufferGeometry {
     }
   }
 
+  if (geometry) {
+    const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
+    posAttr.copyArray(positions);
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
   const row = segmentsV + 1;
   for (let iu = 0; iu < segmentsU; iu += 1) {
     for (let iv = 0; iv < segmentsV; iv += 1) {
@@ -43,25 +51,46 @@ function createMobiusGeometry(detail: number): THREE.BufferGeometry {
     }
   }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+  const newGeometry = new THREE.BufferGeometry();
+  newGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  newGeometry.setIndex(indices);
+  newGeometry.computeVertexNormals();
+  return newGeometry;
 }
 
-function createKnotGeometry(detail: number, scale = 1): THREE.BufferGeometry {
-  const tubularSegments = 180 + detail * 90;
-  const radialSegments = 14 + detail * 3;
-  const radius = 1.18 + detail * 0.012;
-  const tube = 0.07 + detail * 0.003;
+function createKnotGeometry(detail: number, scale = 1, geometry?: THREE.BufferGeometry): THREE.BufferGeometry {
+  const tubularSegments = 720;
+  const radialSegments = 32;
+  const radius = 1.18 + detail * 0.01;
+  const tube = 0.07 + detail * 0.002;
+  const p = 2; // Упрощенный узел
+  const q = 3;
+
+  if (geometry) {
+    const tempGeometry = new THREE.TorusKnotGeometry(
+      radius * scale,
+      tube * scale,
+      tubularSegments,
+      radialSegments,
+      p,
+      q,
+    );
+    const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const tempPosAttr = tempGeometry.getAttribute("position") as THREE.BufferAttribute;
+    posAttr.copyArray(tempPosAttr.array as number[]);
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    tempGeometry.dispose();
+    return geometry;
+  }
+
   return new THREE.TorusKnotGeometry(
     radius * scale,
     tube * scale,
     tubularSegments,
     radialSegments,
-    2 + Math.floor(detail * 0.5),
-    3,
+    p,
+    q,
   );
 }
 
@@ -72,8 +101,6 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
   const rootGroupRef = useRef<THREE.Group | null>(null);
   const mobiusRef = useRef<THREE.Mesh | null>(null);
   const knotARef = useRef<THREE.Mesh | null>(null);
-  const knotBRef = useRef<THREE.Mesh | null>(null);
-  const knotCRef = useRef<THREE.Mesh | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef({ x: 0, y: 0 });
@@ -93,47 +120,23 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
     const knotColor = new THREE.Color(0x7dd5ff);
 
     if (mobiusRef.current) {
-      const oldGeometry = mobiusRef.current.geometry;
-      const newGeometry = createMobiusGeometry(complexity);
-      mobiusRef.current.geometry = newGeometry;
-      oldGeometry.dispose();
-
+      createMobiusGeometry(complexity, mobiusRef.current.geometry);
       const mat = mobiusRef.current.material as THREE.MeshBasicMaterial;
       mat.color.copy(mobiusColor);
-      mat.opacity = 0.44 + Math.min(0.32, complexity * 0.065);
+      mat.opacity = 0.44 + Math.min(0.32, complexity * 0.08);
     }
 
     if (knotARef.current) {
-      const oldGeometry = knotARef.current.geometry;
-      knotARef.current.geometry = createKnotGeometry(complexity, 1);
-      oldGeometry.dispose();
+      createKnotGeometry(complexity, 1, knotARef.current.geometry);
       const mat = knotARef.current.material as THREE.MeshBasicMaterial;
       mat.color.copy(knotColor);
-      mat.opacity = 0.42 + Math.min(0.24, complexity * 0.045);
-    }
-
-    if (knotBRef.current) {
-      const oldGeometry = knotBRef.current.geometry;
-      knotBRef.current.geometry = createKnotGeometry(Math.max(1, complexity - 1), 0.78);
-      oldGeometry.dispose();
-      knotBRef.current.visible = complexity >= 3;
-      const mat = knotBRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.2 + Math.min(0.18, complexity * 0.03);
-    }
-
-    if (knotCRef.current) {
-      const oldGeometry = knotCRef.current.geometry;
-      knotCRef.current.geometry = createKnotGeometry(Math.max(1, complexity - 2), 0.56);
-      oldGeometry.dispose();
-      knotCRef.current.visible = complexity >= 5;
-      const mat = knotCRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.14 + Math.min(0.14, complexity * 0.024);
+      mat.opacity = 0.42 + Math.min(0.24, complexity * 0.06);
     }
 
     if (particlesRef.current && particlesRef.current.material) {
       const mat = particlesRef.current.material as THREE.PointsMaterial;
-      mat.size = 0.02 + Math.min(0.035, complexity * 0.0045);
-      mat.opacity = 0.18 + Math.min(0.28, complexity * 0.048);
+      mat.size = 0.02 + Math.min(0.035, complexity * 0.005);
+      mat.opacity = 0.18 + Math.min(0.28, complexity * 0.06);
     }
   };
 
@@ -173,6 +176,7 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
         opacity: 0.52,
       }),
     );
+    mobius.geometry.setDrawRange(0, Infinity);
     mobiusRef.current = mobius;
     rootGroup.add(mobius);
 
@@ -185,36 +189,9 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
         opacity: 0.45,
       }),
     );
+    knotA.geometry.setDrawRange(0, Infinity);
     knotARef.current = knotA;
     rootGroup.add(knotA);
-
-    const knotB = new THREE.Mesh(
-      createKnotGeometry(1, 0.78),
-      new THREE.MeshBasicMaterial({
-        color: 0xa3bcff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.24,
-      }),
-    );
-    knotB.position.x = 0.24;
-    knotB.rotation.x = 0.8;
-    knotBRef.current = knotB;
-    rootGroup.add(knotB);
-
-    const knotC = new THREE.Mesh(
-      createKnotGeometry(1, 0.56),
-      new THREE.MeshBasicMaterial({
-        color: 0xc4cbff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.2,
-      }),
-    );
-    knotC.position.x = -0.27;
-    knotC.rotation.y = 0.92;
-    knotCRef.current = knotC;
-    rootGroup.add(knotC);
 
     const particleCount = 220;
     const particleGeometry = new THREE.BufferGeometry();
@@ -310,8 +287,18 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
     window.addEventListener("resize", handleResize);
 
     let animationId: number;
+    let lastComplexity = -1;
+
     const animate = (time: number) => {
       animationId = requestAnimationFrame(animate);
+
+      const targetComplexity = 1 + scrollProgressRef.current * 1.5;
+      const currentComplexity = lastComplexity === -1 ? targetComplexity : lastComplexity + (targetComplexity - lastComplexity) * 0.05;
+
+      if (Math.abs(currentComplexity - lastComplexity) > 0.001) {
+        applyComplexity(currentComplexity);
+        lastComplexity = currentComplexity;
+      }
 
       dragRef.current.x += (dragTargetRef.current.x - dragRef.current.x) * 0.09;
       dragRef.current.y += (dragTargetRef.current.y - dragRef.current.y) * 0.09;
@@ -342,12 +329,6 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
       if (knotARef.current) {
         knotARef.current.rotation.x += 0.0012;
         knotARef.current.rotation.z += 0.0017;
-      }
-      if (knotBRef.current) {
-        knotBRef.current.rotation.y -= 0.0015;
-      }
-      if (knotCRef.current) {
-        knotCRef.current.rotation.x += 0.0019;
       }
       if (particlesRef.current) {
         particlesRef.current.rotation.y += 0.0006;
@@ -383,14 +364,6 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
         knotARef.current.geometry.dispose();
         (knotARef.current.material as THREE.MeshBasicMaterial).dispose();
       }
-      if (knotBRef.current) {
-        knotBRef.current.geometry.dispose();
-        (knotBRef.current.material as THREE.MeshBasicMaterial).dispose();
-      }
-      if (knotCRef.current) {
-        knotCRef.current.geometry.dispose();
-        (knotCRef.current.material as THREE.MeshBasicMaterial).dispose();
-      }
       particleGeometry.dispose();
       particleMaterial.dispose();
       renderer.dispose();
@@ -398,11 +371,8 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
   }, []);
 
   useEffect(() => {
-    if (activeSection === lastSectionRef.current) return;
+    // We no longer call applyComplexity here as it's handled in animate loop
     lastSectionRef.current = activeSection;
-    const complexity =
-      complexityBySection[activeSection] ?? complexityBySection[complexityBySection.length - 1];
-    applyComplexity(complexity);
   }, [activeSection]);
 
   return (
@@ -437,7 +407,7 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
           pointerEvents: "none",
         }}
       >
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
             style={{

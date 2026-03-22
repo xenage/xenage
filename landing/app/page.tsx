@@ -11,7 +11,6 @@ import InstallSection from "./components/InstallSection";
 import FeaturesSection from "./components/FeaturesSection";
 import ScaleSection from "./components/ScaleSection";
 import GuiSection from "./components/GuiSection";
-import PackagesSection from "./components/PackagesSection";
 import CtaSection from "./components/CtaSection";
 import Footer from "./components/Footer";
 
@@ -19,53 +18,43 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState(0);
-  const [seamClip, setSeamClip] = useState("polygon(0% 0%, 76% 0%, 72% 100%, 0% 100%)");
-  const [seamClipSoft, setSeamClipSoft] = useState(
-    "polygon(0% 0%, 81% 0%, 77% 100%, 0% 100%)",
-  );
+  const seamClip = "polygon(0% 0%, 76% 0%, 75.5% 12%, 76.8% 24%, 74.2% 38%, 76.2% 52%, 73.8% 66%, 75.6% 82%, 72% 100%, 0% 100%)";
+  const seamClipSoft = "polygon(0% 0%, 81% 0%, 80.5% 14%, 81.8% 28%, 79.2% 42%, 81.2% 56%, 78.8% 70%, 80.6% 86%, 77% 100%, 0% 100%)";
 
-  const [seamClipMobile, setSeamClipMobile] = useState("polygon(0% 100%, 100% 100%, 100% 24%, 0% 28%)");
-  const [seamClipSoftMobile, setSeamClipSoftMobile] = useState(
-    "polygon(0% 100%, 100% 100%, 100% 19%, 0% 23%)",
-  );
-
-  const createSeamClip = (seedOffset: number, base: number, variation: number, horizontal = false) => {
-    const points: string[] = horizontal ? [] : ["0% 0%"];
-    const steps = 20;
-    
-    if (!horizontal) {
-      let x = base + ((Math.sin(seedOffset * 1.79) + 1) * 0.5 - 0.5) * variation;
-      points.push(`${x.toFixed(2)}% 0%`);
-
-      for (let i = 1; i <= steps; i += 1) {
-        const y = (i / steps) * 100;
-        const waveA = Math.sin(seedOffset * 1.7 + i * 0.74) * variation * 0.52;
-        const waveB = Math.cos(seedOffset * 0.82 + i * 1.16) * variation * 0.28;
-        x = Math.max(48, Math.min(96, base + waveA + waveB));
-        points.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
-      }
-
-      points.push("0% 100%");
-    } else {
-      // For mobile: clip-path from top, keeping bottom 100%
-      points.push("0% 100%");
-      points.push("100% 100%");
-      
-      let y = base + ((Math.sin(seedOffset * 1.79) + 1) * 0.5 - 0.5) * variation;
-      points.push(`100% ${y.toFixed(2)}%`);
-
-      for (let i = 1; i <= steps; i += 1) {
-        const x = 100 - (i / steps) * 100;
-        const waveA = Math.sin(seedOffset * 1.7 + i * 0.74) * variation * 0.52;
-        const waveB = Math.cos(seedOffset * 0.82 + i * 1.16) * variation * 0.28;
-        y = Math.max(5, Math.min(45, base + waveA + waveB));
-        points.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
-      }
-      points.push("0% 0%");
-    }
-    
-    return `polygon(${points.join(", ")})`;
+  const seamClipMobile = "polygon(0% 100%, 100% 100%, 100% 24%, 86% 23.5%, 72% 25.2%, 58% 23.8%, 44% 24.8%, 30% 23.2%, 16% 25.5%, 0% 28%)";
+  const seamClipSoftMobile = "polygon(0% 100%, 100% 100%, 100% 19%, 86% 18.5%, 72% 20.2%, 58% 18.8%, 44% 19.8%, 30% 18.2%, 16% 20.5%, 0% 23%)";
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "Xenage",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Linux, macOS, Windows",
+        url: "https://xenage.dev/",
+        description:
+          "Xenage is an agent orchestration platform to run, control, and observe AI agents across clusters.",
+        brand: {
+          "@type": "Brand",
+          name: "Xenage",
+        },
+        sameAs: ["https://github.com/xenage", "https://docs.xenage.dev"],
+      },
+      {
+        "@type": "Organization",
+        name: "Xenage",
+        url: "https://xenage.dev/",
+        logo: "https://xenage.dev/xenage.png",
+        sameAs: ["https://github.com/xenage", "https://docs.xenage.dev"],
+      },
+      {
+        "@type": "WebSite",
+        name: "Xenage",
+        url: "https://xenage.dev/",
+      },
+    ],
   };
+
 
   useEffect(() => {
     const prevScrollRestoration = window.history.scrollRestoration;
@@ -123,16 +112,13 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    const seed = activeSection + 1.137;
-    setSeamClip(createSeamClip(seed, 76, 16));
-    setSeamClipSoft(createSeamClip(seed + 0.61, 82, 11));
-    setSeamClipMobile(createSeamClip(seed, 26, 12, true));
-    setSeamClipSoftMobile(createSeamClip(seed + 0.61, 21, 8, true));
-  }, [activeSection]);
 
   return (
     <div className="page-wrapper">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <Navigation />
       <div className="desktop-shell theme-light">
         <div className="canvas-layer desktop-canvas">
@@ -145,16 +131,15 @@ export default function Home() {
           <div className="canvas-wall-highlight-mobile" style={{ clipPath: seamClipSoftMobile }} />
           <HeroCanvas activeSection={activeSection} />
         </div>
-        <div className="content-wrapper">
+        <main className="content-wrapper">
           <HeroSection />
           <ProblemsSection />
           <InstallSection />
           <FeaturesSection />
           <ScaleSection />
           <GuiSection />
-          <PackagesSection />
           <CtaSection />
-        </div>
+        </main>
       </div>
       <div className="footer-wrapper">
         <Footer />
@@ -214,7 +199,6 @@ export default function Home() {
             var(--seam-bg-soft) 78%,
             rgba(0, 0, 0, 0) 100%
           );
-          transition: clip-path 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .canvas-wall-highlight {
@@ -229,7 +213,6 @@ export default function Home() {
             radial-gradient(62px 34px at 76% 58%, rgba(255, 255, 255, 0.28), transparent 70%),
             radial-gradient(44px 28px at 72% 84%, rgba(255, 255, 255, 0.28), transparent 72%);
           opacity: 0.85;
-          transition: clip-path 600ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .canvas-wall-mobile {
@@ -247,7 +230,6 @@ export default function Home() {
             var(--seam-bg-soft) 78%,
             rgba(0, 0, 0, 0) 100%
           );
-          transition: clip-path 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .canvas-wall-highlight-mobile {
@@ -263,7 +245,6 @@ export default function Home() {
             radial-gradient(62px 34px at 58% 76%, rgba(255, 255, 255, 0.28), transparent 70%),
             radial-gradient(44px 28px at 84% 72%, rgba(255, 255, 255, 0.28), transparent 72%);
           opacity: 0.85;
-          transition: clip-path 600ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .content-wrapper {
@@ -310,8 +291,7 @@ export default function Home() {
         .content-wrapper :global(.platforms-grid),
         .content-wrapper :global(.features-grid),
         .content-wrapper :global(.scale-points),
-        .content-wrapper :global(.gui-grid),
-        .content-wrapper :global(.pkg-grid) {
+        .content-wrapper :global(.gui-grid) {
           position: relative !important;
           z-index: 42 !important;
         }

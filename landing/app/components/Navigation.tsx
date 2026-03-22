@@ -17,6 +17,7 @@ export default function Navigation() {
 
   return (
     <nav
+      aria-label="Primary"
       className={`nav ${isScrolled ? "nav-scrolled" : ""}`}
       style={{
         width: "100%",
@@ -143,7 +144,8 @@ export default function Navigation() {
           >
             GUI
           </a>
-          <button
+          <a
+            href="#install"
             style={{
               fontFamily: "Space Grotesk, sans-serif",
               fontSize: "0.85rem",
@@ -155,10 +157,11 @@ export default function Navigation() {
               cursor: "pointer",
               borderRadius: "8px",
               transition: "all 0.3s ease",
+              textDecoration: "none",
             }}
           >
             Get Started
-          </button>
+          </a>
         </div>
 
         <button
@@ -243,7 +246,8 @@ export default function Navigation() {
           >
             GUI
           </a>
-          <button
+          <a
+            href="#install"
             style={{
               fontFamily: "Space Grotesk, sans-serif",
               fontSize: "0.85rem",
@@ -254,10 +258,11 @@ export default function Navigation() {
               color: "#fafafa",
               cursor: "pointer",
               borderRadius: "8px",
+              textDecoration: "none",
             }}
           >
             Get Started
-          </button>
+          </a>
         </div>
       )}
 

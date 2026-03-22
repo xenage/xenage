@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer
       style={{
@@ -230,7 +232,9 @@ export default function Footer() {
                 }}
               >
                 <a
-                  href="#"
+                  href="https://docs.xenage.dev"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     fontFamily: "Space Grotesk, sans-serif",
                     fontSize: "0.85rem",
@@ -242,7 +246,9 @@ export default function Footer() {
                   About
                 </a>
                 <a
-                  href="#"
+                  href="https://github.com/xenage/xenage/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     fontFamily: "Space Grotesk, sans-serif",
                     fontSize: "0.85rem",
@@ -277,7 +283,7 @@ export default function Footer() {
             margin: 0,
           }}
         >
-          © 2025 Xenage. All rights reserved.
+          © {currentYear} Xenage. All rights reserved.
         </p>
       </div>
     </footer>

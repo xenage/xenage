@@ -48,16 +48,26 @@ export default function ProblemsSection() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.from(".problem-card", {
-        y: 40,
-        duration: 0.6,
-        stagger: 0.08,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: ".problems-grid",
-          start: "top 80%",
+      gsap.fromTo(
+        ".problem-card",
+        {
+          y: 40,
+          opacity: 0,
         },
-      });
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.6,
+          stagger: 0.08,
+          ease: "power3.out",
+          clearProps: "transform,opacity",
+          scrollTrigger: {
+            trigger: ".problems-grid",
+            start: "top 80%",
+            once: true,
+          },
+        },
+      );
     }, sectionRef);
 
     return () => ctx.revert();

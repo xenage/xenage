@@ -9,7 +9,7 @@ export default function HeroSection() {
   const [copied, setCopied] = useState(false);
 
   const copyInstall = async () => {
-    await navigator.clipboard.writeText("curl https://xenage.dev | bash");
+    await navigator.clipboard.writeText("curl https://xenage.dev | sh");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -77,6 +77,7 @@ export default function HeroSection() {
           style={{
             display: "inline-flex",
             alignItems: "center",
+            width: "fit-content",
             gap: "0.5rem",
             padding: "0.5rem 1rem",
             background: "rgba(0, 102, 255, 0.08)",
@@ -162,7 +163,7 @@ export default function HeroSection() {
                 minWidth: 0,
               }}
             >
-              curl https://xenage.dev | bash
+              curl https://xenage.dev | sh
             </code>
             <button
               type="button"
@@ -193,7 +194,7 @@ export default function HeroSection() {
               margin: 0,
             }}
           >
-            One-command installation or choose from packages below
+            One-command installation
           </p>
         </div>
 
@@ -220,7 +221,7 @@ export default function HeroSection() {
               transition: "all 0.3s ease",
             }}
           >
-            <span>View Packages</span>
+            <span>Quick Start</span>
             <ArrowRight size={18} />
           </a>
           <a
