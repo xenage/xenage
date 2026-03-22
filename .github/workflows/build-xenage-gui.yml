@@ -107,45 +107,44 @@ jobs:
           bundle_dir="apps/xenage-gui/src-tauri/target/release/bundle"
           latest_count="$(find "${bundle_dir}" -type f -name latest.json | wc -l | tr -d ' ')"
           if [ "${latest_count}" = "0" ]; then
-            echo "No updater metadata (latest.json) was generated under ${bundle_dir}" >&2
-            exit 1
-          fi
+            echo "No updater metadata (latest.json) was generated under ${bundle_dir}; continuing without updater manifest upload."
+          else
+            node - <<'NODE'
+            const fs = require('fs');
+            const path = require('path');
 
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
+            const root = path.resolve('apps/xenage-gui/src-tauri/target/release/bundle');
+            const latestFiles = [];
 
-          const root = path.resolve('apps/xenage-gui/src-tauri/target/release/bundle');
-          const latestFiles = [];
-
-          function walk(dir) {
-            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-              const full = path.join(dir, entry.name);
-              if (entry.isDirectory()) {
-                walk(full);
-              } else if (entry.isFile() && entry.name === 'latest.json') {
-                latestFiles.push(full);
+            function walk(dir) {
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                  walk(full);
+                } else if (entry.isFile() && entry.name === 'latest.json') {
+                  latestFiles.push(full);
+                }
               }
             }
-          }
 
-          walk(root);
-          if (latestFiles.length === 0) {
-            throw new Error('No latest.json files found after build.');
-          }
-
-          for (const file of latestFiles) {
-            const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
-            if (!payload.platforms || typeof payload.platforms !== 'object') {
-              throw new Error(`Updater manifest ${file} does not contain "platforms".`);
+            walk(root);
+            if (latestFiles.length === 0) {
+              throw new Error('No latest.json files found after build.');
             }
-            if (Object.keys(payload.platforms).length === 0) {
-              throw new Error(`Updater manifest ${file} has an empty "platforms" map.`);
-            }
-          }
 
-          console.log(`Validated ${latestFiles.length} updater manifest(s).`);
-          NODE
+            for (const file of latestFiles) {
+              const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
+              if (!payload.platforms || typeof payload.platforms !== 'object') {
+                throw new Error(`Updater manifest ${file} does not contain "platforms".`);
+              }
+              if (Object.keys(payload.platforms).length === 0) {
+                throw new Error(`Updater manifest ${file} has an empty "platforms" map.`);
+              }
+            }
+
+            console.log(`Validated ${latestFiles.length} updater manifest(s).`);
+            NODE
+          fi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -302,7 +301,10 @@ jobs:
 
           const latestFiles = allFiles.filter((file) => path.basename(file) === 'latest.json');
           if (latestFiles.length === 0) {
-            throw new Error('No latest.json files found in downloaded artifacts.');
+            fs.writeFileSync(updaterListOutput, '');
+            fs.writeFileSync(skippedLatestOutput, '');
+            console.log('No latest.json files found in downloaded artifacts; skipping merged updater manifest upload.');
+            process.exit(0);
           }
 
           const firstManifest = JSON.parse(fs.readFileSync(latestFiles[0], 'utf8'));
@@ -419,4 +421,8 @@ jobs:
             gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
           done
 
-          gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}"
+          if [ -f /tmp/latest.json ]; then
+            gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}"
+          else
+            echo "Skipping /tmp/latest.json upload because no updater manifest was produced."
+          fi

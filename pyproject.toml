@@ -5,6 +5,7 @@ description = "Shared control plane structures for Xenage runtime and GUI."
 requires-python = ">=3.13"
 dependencies = [
   "msgspec>=0.19.0",
+  "PyYAML>=6.0.2",
   "cryptography>=45.0.0",
   "loguru>=0.7.3",
   "dynaconf>=3.2.11",

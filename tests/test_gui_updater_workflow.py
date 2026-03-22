@@ -13,6 +13,7 @@ def test_gui_workflow_uploads_updater_artifacts():
 
     assert "verify updater artifacts (post-build)" in content
     assert "bundle/**/latest.json" in content
+    assert "continuing without updater manifest upload" in content
     assert "bundle/**/*.sig" in content
     assert "bundle/**/*.tar.gz" in content
     assert "bundle/**/*.zip" in content
