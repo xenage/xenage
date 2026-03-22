@@ -52,14 +52,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Restore Tauri build cache
+        if: false
         id: tauri_cache_restore
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            apps/xenage-gui/src-tauri/target
-          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-v2
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -102,10 +102,13 @@ jobs:
           fi
 
       - name: build frontend and tauri app
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: yarn tauri build
+        run: |
+          rm -rf src-tauri/target
+          yarn tauri build
         working-directory: apps/xenage-gui
 
       - name: verify updater artifacts (post-build)
@@ -136,25 +139,24 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
 
       - name: Save Tauri build cache
-        if: success() && github.event_name != 'pull_request'
+        if: false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          cache_key="xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest"
+          cache_key="xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-v2"
           while IFS= read -r cache_id; do
             [ -n "${cache_id}" ] || continue
             gh api --method DELETE "repos/${{ github.repository }}/actions/caches/${cache_id}" || true
           done < <(gh api "repos/${{ github.repository }}/actions/caches?key=${cache_key}" --jq '.actions_caches[].id')
       - name: Save Tauri build cache blob
-        if: success() && github.event_name != 'pull_request'
+        if: false
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            apps/xenage-gui/src-tauri/target
-          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-latest
+          key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-v2
 
   publish_release:
     if: github.event_name != 'pull_request'
