@@ -34,7 +34,7 @@ function createMobiusGeometry(detail: number, geometry?: THREE.BufferGeometry): 
 
   if (geometry) {
     const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
-    posAttr.copyArray(positions);
+    (posAttr.array as Float32Array).set(positions);
     posAttr.needsUpdate = true;
     geometry.computeVertexNormals();
     return geometry;
@@ -77,7 +77,7 @@ function createKnotGeometry(detail: number, scale = 1, geometry?: THREE.BufferGe
     );
     const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
     const tempPosAttr = tempGeometry.getAttribute("position") as THREE.BufferAttribute;
-    posAttr.copyArray(tempPosAttr.array as number[]);
+    (posAttr.array as Float32Array).set(tempPosAttr.array);
     posAttr.needsUpdate = true;
     geometry.computeVertexNormals();
     tempGeometry.dispose();
