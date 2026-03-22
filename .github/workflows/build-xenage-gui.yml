@@ -13,7 +13,7 @@ jobs:
       contents: write
       actions: write
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - platform: macos-15-intel
@@ -127,6 +127,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.ref == 'refs/heads/dev' && format('xenage-gui-dev-{0}-{1}', matrix.os, matrix.arch) || format('xenage-gui-{0}-{1}', matrix.os, matrix.arch) }}
+          if-no-files-found: error
           path: |
             apps/xenage-gui/src-tauri/target/release/bundle/msi/*.msi
             apps/xenage-gui/src-tauri/target/release/bundle/setup.exe
@@ -159,7 +160,7 @@ jobs:
           key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-v2
 
   publish_release:
-    if: github.event_name != 'pull_request' && always()
+    if: github.event_name != 'pull_request' && needs.build.result == 'success'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -223,7 +224,7 @@ jobs:
           while IFS= read -r asset_id; do
             [ -n "${asset_id}" ] || continue
             gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}"
-          done < <(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}/assets" --paginate --jq '.[].id')
+          done < <(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets --jq '.assets[].id')
 
       - name: upload release assets
         env:
@@ -361,7 +362,7 @@ jobs:
               base="$(basename "${file}")"
               upload_path="/tmp/${base}"
               cp "${file}" "${upload_path}"
-              gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
+              gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}" --clobber
               continue
             fi
 
@@ -394,11 +395,26 @@ jobs:
             upload_name="${os_label}_${arch_label}_Xenage_GUI_${RELEASE_VERSION}_${sanitized_base}"
             upload_path="/tmp/${upload_name}"
             cp "${file}" "${upload_path}"
-            gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
+            gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}" --clobber
           done
 
           if [ -f /tmp/latest.json ]; then
-            gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}"
+            gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}" --clobber
           else
             echo "Skipping /tmp/latest.json upload because no updater manifest was produced."
+          fi
+
+      - name: verify uploaded release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_count="$(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets --jq '.assets | length')"
+          echo "Release ${RELEASE_TAG} asset count: ${asset_count}"
+          if [ "${asset_count}" -eq 0 ]; then
+            echo "Release assets were not uploaded." >&2
+            exit 1
           fi
