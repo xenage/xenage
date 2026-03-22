@@ -117,41 +117,7 @@ jobs:
           if [ "${latest_count}" = "0" ]; then
             echo "No updater metadata (latest.json) was generated under ${bundle_dir}; continuing without updater manifest upload."
           else
-            node - <<'NODE'
-            const fs = require('fs');
-            const path = require('path');
-
-            const root = path.resolve('apps/xenage-gui/src-tauri/target/release/bundle');
-            const latestFiles = [];
-
-            function walk(dir) {
-              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                const full = path.join(dir, entry.name);
-                if (entry.isDirectory()) {
-                  walk(full);
-                } else if (entry.isFile() && entry.name === 'latest.json') {
-                  latestFiles.push(full);
-                }
-              }
-            }
-
-            walk(root);
-            if (latestFiles.length === 0) {
-              throw new Error('No latest.json files found after build.');
-            }
-
-            for (const file of latestFiles) {
-              const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
-              if (!payload.platforms || typeof payload.platforms !== 'object') {
-                throw new Error(`Updater manifest ${file} does not contain "platforms".`);
-              }
-              if (Object.keys(payload.platforms).length === 0) {
-                throw new Error(`Updater manifest ${file} has an empty "platforms" map.`);
-              }
-            }
-
-            console.log(`Validated ${latestFiles.length} updater manifest(s).`);
-            NODE
+            python -c "import json, pathlib; root=pathlib.Path('${bundle_dir}'); files=list(root.rglob('latest.json')); assert files, 'No latest.json files found after build.'; [(_ for _ in ()).throw(AssertionError(f'Updater manifest {f} does not contain platforms')) if not isinstance((payload:=json.loads(f.read_text(encoding='utf-8'))).get('platforms'), dict) else None for f in files]; [(_ for _ in ()).throw(AssertionError(f'Updater manifest {f} has an empty platforms map')) if len(json.loads(f.read_text(encoding='utf-8')).get('platforms', {})) == 0 else None for f in files]; print(f'Validated {len(files)} updater manifest(s).')"
           fi
 
       - name: upload artifacts
