@@ -1073,26 +1073,38 @@ async fn install_standalone_bundle(
     }
 
     let bin_dir = standalone_bin_dir(&app)?;
-    let cp_source = temp_extract.join(if std::env::consts::OS == "windows" {
+    let cp_name = if std::env::consts::OS == "windows" {
         "xenage-control-plane.exe"
     } else {
         "xenage-control-plane"
-    });
-    let rt_source = temp_extract.join(if std::env::consts::OS == "windows" {
+    };
+    let rt_name = if std::env::consts::OS == "windows" {
         "xenage-runtime.exe"
     } else {
         "xenage-runtime"
+    };
+    let cp_target = bin_dir.join(cp_name);
+    let rt_target = bin_dir.join(rt_name);
+
+    let xenage_source = temp_extract.join(if std::env::consts::OS == "windows" {
+        "xenage.exe"
+    } else {
+        "xenage"
     });
 
-    if !cp_source.exists() || !rt_source.exists() {
-        return Err("Standalone archive is missing required binaries".to_string());
+    if xenage_source.exists() {
+        fs::copy(&xenage_source, &cp_target).map_err(|error| error.to_string())?;
+        fs::copy(&xenage_source, &rt_target).map_err(|error| error.to_string())?;
+    } else {
+        let cp_source = temp_extract.join(cp_name);
+        let rt_source = temp_extract.join(rt_name);
+        if !cp_source.exists() || !rt_source.exists() {
+            return Err("Standalone archive is missing required binaries".to_string());
+        }
+        fs::copy(&cp_source, &cp_target).map_err(|error| error.to_string())?;
+        fs::copy(&rt_source, &rt_target).map_err(|error| error.to_string())?;
     }
 
-    let cp_target = bin_dir.join(cp_source.file_name().unwrap_or_default());
-    let rt_target = bin_dir.join(rt_source.file_name().unwrap_or_default());
-
-    fs::copy(&cp_source, &cp_target).map_err(|error| error.to_string())?;
-    fs::copy(&rt_source, &rt_target).map_err(|error| error.to_string())?;
     mark_executable(&cp_target)?;
     mark_executable(&rt_target)?;
 

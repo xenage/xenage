@@ -52,7 +52,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Restore Tauri build cache
-        if: false
         id: tauri_cache_restore
         uses: actions/cache/restore@v4
         with:
@@ -140,7 +139,7 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
 
       - name: Save Tauri build cache
-        if: false
+        if: success() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -151,7 +150,7 @@ jobs:
             gh api --method DELETE "repos/${{ github.repository }}/actions/caches/${cache_id}" || true
           done < <(gh api "repos/${{ github.repository }}/actions/caches?key=${cache_key}" --jq '.actions_caches[].id')
       - name: Save Tauri build cache blob
-        if: false
+        if: success() && github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -213,18 +212,6 @@ jobs:
         with:
           pattern: ${{ github.ref == 'refs/heads/dev' && 'xenage-gui-dev-*' || 'xenage-gui-*' }}
           path: dist/gui-release
-
-      - name: clear existing release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
-        shell: bash
-        run: |
-          while IFS= read -r asset_id; do
-            [ -n "${asset_id}" ] || continue
-            gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}"
-          done < <(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets --jq '.assets[].id')
 
       - name: upload release assets
         env:

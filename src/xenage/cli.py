@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import argparse
 from pathlib import Path
+import sys
 
 import aiohttp
 from loguru import logger
@@ -21,7 +22,7 @@ from .nodes.control_plane import ControlPlaneNode
 from .nodes.runtime import RuntimeNode
 from .serialization import decode_value, encode_value
 from .crypto import Ed25519KeyPair
-from .cli_ultimate.main import xenage_cli_main as xenage_cli_main_ultimate
+from .cli_ultimate.main import XenageCliApp
 
 
 def _namespace_value(args: argparse.Namespace, key: str) -> object | None:
@@ -78,8 +79,8 @@ def build_common_parser(program_name: str) -> argparse.ArgumentParser:
     return parser
 
 
-def control_plane_main() -> None:
-    parser = build_common_parser("xenage-control-plane")
+def control_plane_main(argv: list[str] | None = None, program_name: str = "xenage-control-plane") -> None:
+    parser = build_common_parser(program_name)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init")
@@ -119,7 +120,7 @@ def control_plane_main() -> None:
     gui_bootstrap_user_parser.add_argument("--user-id", default="admin")
     gui_bootstrap_user_parser.add_argument("--out")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logger.trace("parsed control-plane args={}", args)
     config = load_config(_optional_path(args.config))
     log_level = args.log_level or config.log_level
@@ -249,8 +250,8 @@ def control_plane_main() -> None:
             logger.info("wrote gui user config path={}", args.out)
         print(gui_config, end="" if gui_config.endswith("\n") else "\n")
         return
-def runtime_main() -> None:
-    parser = build_common_parser("xenage-runtime")
+def runtime_main(argv: list[str] | None = None, program_name: str = "xenage-runtime") -> None:
+    parser = build_common_parser(program_name)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     serve_parser = subparsers.add_parser("serve")
@@ -262,7 +263,7 @@ def runtime_main() -> None:
     connect_parser.add_argument("--leader-pubkey", required=True)
     connect_parser.add_argument("--bootstrap-token", required=True)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logger.trace("parsed runtime args={}", args)
     config = load_config(_optional_path(args.config))
     log_level = args.log_level or config.log_level
@@ -292,5 +293,34 @@ def runtime_main() -> None:
         print(state.dump_json())
 
 
+def _dispatch_mode(executable_name: str, argv: list[str]) -> tuple[str, list[str]]:
+    executable = Path(executable_name).name.lower()
+    if executable in {"xenage-control-plane", "xenage-control-plane.exe"}:
+        return "control-plane", argv
+    if executable in {"xenage-runtime", "xenage-runtime.exe"}:
+        return "runtime", argv
+
+    if argv:
+        if argv[0] == "control-plane":
+            return "control-plane", argv[1:]
+        if argv[0] == "runtime":
+            return "runtime", argv[1:]
+
+    return "cli", argv
+
+
 def xenage_cli_main() -> None:
-    xenage_cli_main_ultimate()
+    argv = list(sys.argv[1:])
+    mode, remaining = _dispatch_mode(sys.argv[0], argv)
+
+    if mode == "control-plane":
+        control_plane_main(remaining, "xenage control-plane")
+        return
+    if mode == "runtime":
+        runtime_main(remaining, "xenage runtime")
+        return
+
+    app = XenageCliApp()
+    exit_code = app.execute(remaining)
+    if exit_code != 0:
+        raise SystemExit(exit_code)

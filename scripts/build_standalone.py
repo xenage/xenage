@@ -96,15 +96,8 @@ def export_direct_binaries(
     exported: list[Path] = []
 
     for binary in binaries:
-        binary_name = binary.name
-        kind = "binary"
-        if "control-plane" in binary_name:
-            kind = "control_plane"
-        elif "runtime" in binary_name:
-            kind = "runtime"
-
         ext = binary.suffix
-        target_name = f"{os_label}_{arch_label}_xenage_{kind}_{version}{ext}"
+        target_name = f"{os_label}_{arch_label}_xenage_{version}{ext}"
         target_path = output_dir / target_name
         shutil.copy2(binary, target_path)
         exported.append(target_path)
@@ -139,8 +132,7 @@ def main() -> None:
     pyinstaller_dist.mkdir(parents=True, exist_ok=True)
 
     targets = [
-        TargetBinary("xenage-control-plane", Path("scripts/standalone/control_plane_entrypoint.py").resolve()),
-        TargetBinary("xenage-runtime", Path("scripts/standalone/runtime_entrypoint.py").resolve()),
+        TargetBinary("xenage", Path("scripts/standalone/xenage_entrypoint.py").resolve()),
     ]
 
     built_binaries = [run_pyinstaller(target, build_dir, pyinstaller_dist) for target in targets]

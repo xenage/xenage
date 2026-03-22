@@ -96,14 +96,13 @@ jobs:
             binary_suffix=".exe"
           fi
 
-          control_plane_bin="dist/standalone-build/pyinstaller-dist/xenage-control-plane${binary_suffix}"
-          runtime_bin="dist/standalone-build/pyinstaller-dist/xenage-runtime${binary_suffix}"
+          xenage_bin="dist/standalone-build/pyinstaller-dist/xenage${binary_suffix}"
 
-          [ -f "${control_plane_bin}" ]
-          [ -f "${runtime_bin}" ]
+          [ -f "${xenage_bin}" ]
 
-          "${control_plane_bin}" --help >/dev/null
-          "${runtime_bin}" --help >/dev/null
+          "${xenage_bin}" --help >/dev/null
+          "${xenage_bin}" control-plane --help >/dev/null
+          "${xenage_bin}" runtime --help >/dev/null
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -172,18 +171,6 @@ jobs:
           pattern: xenage-standalone-*
           merge-multiple: true
           path: dist/standalone-release
-
-      - name: clear existing release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
-        shell: bash
-        run: |
-          while IFS= read -r asset_id; do
-            [ -n "${asset_id}" ] || continue
-            gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}"
-          done < <(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets --jq '.assets[].id')
 
       - name: upload release assets
         env:
