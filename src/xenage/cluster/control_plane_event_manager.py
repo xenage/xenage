@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import msgspec
 
+import msgspec
 from loguru import logger
 
 from structures.resources.events import (
+    ClusterAuditEventAppendedEvent,
     ControlPlaneEventLog,
     ControlPlaneEventPage,
     ControlPlaneSyncEvent,
@@ -14,23 +15,19 @@ from structures.resources.events import (
     GroupNodeJoinedEvent,
     GroupNodeRevokedEvent,
     GroupStateApplyEvent,
+    RbacStateApplyEvent,
     UserEventAppendedEvent,
     UserStateApplyEvent,
     UserUpsertedEvent,
 )
-from structures.resources.membership import (
-    EventLogEntry,
-    GroupState,
-    NodeRecord,
-    UserRecord,
-    UserState,
-)
+from structures.resources.membership import EventLogEntry, GroupState, NodeRecord, UserRecord
+from structures.resources.rbac import RbacState
 
-from ..persistence.storage_layer import StorageLayer
 from ..crypto import make_nonce
+from ..persistence.storage_layer import StorageLayer
+from .rbac_state_manager import RbacStateManager
 from .state_manager import StateManager, StateVersionRegressedError
 from .time_utils import format_timestamp, utc_now
-from .user_state_manager import UserStateManager
 
 
 class ControlPlaneEventSyncError(RuntimeError):
@@ -38,10 +35,10 @@ class ControlPlaneEventSyncError(RuntimeError):
 
 
 class ControlPlaneEventManager:
-    def __init__(self, storage: StorageLayer, state_manager: StateManager, user_state_manager: UserStateManager) -> None:
+    def __init__(self, storage: StorageLayer, state_manager: StateManager, rbac_state_manager: RbacStateManager) -> None:
         self.storage = storage
         self.state_manager = state_manager
-        self.user_state_manager = user_state_manager
+        self.rbac_state_manager = rbac_state_manager
         self.current = storage.load_control_plane_event_log()
         logger.debug("control-plane event manager initialized items={}", len(self.current.items))
 
@@ -52,10 +49,25 @@ class ControlPlaneEventManager:
         return self.current.items[-1].nonce if self.current.items else ""
 
     def current_state_hash(self) -> str:
-        user_state = self.user_state_manager.get_state()
+        rbac_state = self.rbac_state_manager.get_state()
         events_payload = msgspec.json.encode(self.current)
-        user_payload = msgspec.json.encode(user_state)
-        return hashlib.sha256(events_payload + b"\n" + user_payload).hexdigest()
+        rbac_payload = msgspec.json.encode(rbac_state)
+        return hashlib.sha256(events_payload + b"\n" + rbac_payload).hexdigest()
+
+    def cluster_audit_events(self) -> list[EventLogEntry]:
+        items: list[EventLogEntry] = []
+        has_cluster_audit = any(isinstance(sync_event, ClusterAuditEventAppendedEvent) for sync_event in self.current.items)
+        for sync_event in self.current.items:
+            if isinstance(sync_event, ClusterAuditEventAppendedEvent):
+                items.append(sync_event.event)
+            elif isinstance(sync_event, UserEventAppendedEvent) and not has_cluster_audit:
+                # Legacy compatibility for old persisted logs.
+                items.append(sync_event.event)
+        return items
+
+    def _next_audit_sequence(self) -> int:
+        entries = self.cluster_audit_events()
+        return (entries[-1].sequence + 1) if entries else 1
 
     def _persist(self) -> None:
         self.storage.save_control_plane_event_log(self.current)
@@ -77,28 +89,69 @@ class ControlPlaneEventManager:
             version=group_state.version,
         )
         self._append(event)
-        logger.debug(
-            "recorded group-state sync event event_id={} state_version={}",
-            event.event_id,
-            group_state.version,
-        )
+        logger.debug("recorded group-state sync event event_id={} state_version={}", event.event_id, group_state.version)
         return event
 
-    def record_user_state(self, actor_node_id: str, user_state: UserState) -> UserStateApplyEvent:
-        event = UserStateApplyEvent(
+    def record_rbac_state(self, actor_node_id: str, rbac_state: RbacState) -> RbacStateApplyEvent:
+        event = RbacStateApplyEvent(
             event_id=self.get_last_event_id() + 1,
             happened_at=format_timestamp(utc_now()),
             actor_node_id=actor_node_id,
             nonce=make_nonce(),
-            user_state=user_state,
-            version=user_state.version,
+            rbac_state=rbac_state,
+            version=rbac_state.version,
         )
         self._append(event)
-        logger.debug(
-            "recorded user-state sync event event_id={} user_state_version={}",
-            event.event_id,
-            user_state.version,
+        logger.debug("recorded rbac-state sync event event_id={} rbac_state_version={}", event.event_id, rbac_state.version)
+        return event
+
+    def record_cluster_audit_event(
+        self,
+        actor_node_id: str,
+        actor_type: str,
+        action: str,
+        details: dict[str, str] | None = None,
+    ) -> ClusterAuditEventAppendedEvent:
+        event_entry = EventLogEntry(
+            sequence=self._next_audit_sequence(),
+            happened_at=format_timestamp(utc_now()),
+            actor_id=actor_node_id,
+            actor_type=actor_type,
+            action=action,
+            details=details or {},
         )
+        event = ClusterAuditEventAppendedEvent(
+            event_id=self.get_last_event_id() + 1,
+            happened_at=format_timestamp(utc_now()),
+            actor_node_id=actor_node_id,
+            nonce=make_nonce(),
+            event=event_entry,
+        )
+        self._append(event)
+        return event
+
+    def record_user_upserted(self, actor_node_id: str, user: UserRecord, version: int) -> UserUpsertedEvent:
+        event = UserUpsertedEvent(
+            event_id=self.get_last_event_id() + 1,
+            happened_at=format_timestamp(utc_now()),
+            actor_node_id=actor_node_id,
+            nonce=make_nonce(),
+            user=user,
+            version=version,
+        )
+        self._append(event)
+        return event
+
+    def record_user_event_appended(self, actor_node_id: str, event_entry: EventLogEntry, version: int) -> UserEventAppendedEvent:
+        event = UserEventAppendedEvent(
+            event_id=self.get_last_event_id() + 1,
+            happened_at=format_timestamp(utc_now()),
+            actor_node_id=actor_node_id,
+            nonce=make_nonce(),
+            event=event_entry,
+            version=version,
+        )
+        self._append(event)
         return event
 
     def event_page(self, leader_node_id: str, after_event_id: int, limit: int) -> ControlPlaneEventPage:
@@ -109,11 +162,11 @@ class ControlPlaneEventManager:
                 offset += 1
         items = self.current.items[offset : offset + safe_limit]
         has_more = offset + safe_limit < len(self.current.items)
-        
+
         state = self.state_manager.get_state()
         leader_pubkey = state.leader_pubkey if state else ""
         leader_epoch = state.leader_epoch if state else 0
-        
+
         return ControlPlaneEventPage(
             leader_node_id=leader_node_id,
             leader_pubkey=leader_pubkey,
@@ -186,30 +239,6 @@ class ControlPlaneEventManager:
         self._append(event)
         return event
 
-    def record_user_upserted(self, actor_node_id: str, user: UserRecord, version: int) -> UserUpsertedEvent:
-        event = UserUpsertedEvent(
-            event_id=self.get_last_event_id() + 1,
-            happened_at=format_timestamp(utc_now()),
-            actor_node_id=actor_node_id,
-            nonce=make_nonce(),
-            user=user,
-            version=version,
-        )
-        self._append(event)
-        return event
-
-    def record_user_event_appended(self, actor_node_id: str, event_entry: EventLogEntry, version: int) -> UserEventAppendedEvent:
-        event = UserEventAppendedEvent(
-            event_id=self.get_last_event_id() + 1,
-            happened_at=format_timestamp(utc_now()),
-            actor_node_id=actor_node_id,
-            nonce=make_nonce(),
-            event=event_entry,
-            version=version,
-        )
-        self._append(event)
-        return event
-
     def apply_remote_event(self, event: ControlPlaneSyncEvent, trusted_leader_pubkey: str | None = None) -> bool:
         last_event_id = self.get_last_event_id()
         if event.event_id <= last_event_id:
@@ -220,25 +249,23 @@ class ControlPlaneEventManager:
             if isinstance(event, GroupStateApplyEvent):
                 current = self.state_manager.get_state()
                 if current and event.version < current.version:
-                    logger.warning("skipping remote event application because state version regressed: event_id={} error=group_state version regressed", event.event_id)
+                    logger.warning(
+                        "skipping remote event application because state version regressed: event_id={} error=group_state version regressed",
+                        event.event_id,
+                    )
                 else:
                     self.state_manager.replace_state(event.group_state, trusted_leader_pubkey=trusted_leader_pubkey)
-                    logger.info(
-                        "applied remote group-state event event_id={} state_version={}",
-                        event.event_id,
-                        event.group_state.version,
-                    )
-            elif isinstance(event, UserStateApplyEvent):
-                current = self.user_state_manager.get_state()
+                    logger.info("applied remote group-state event event_id={} state_version={}", event.event_id, event.group_state.version)
+            elif isinstance(event, RbacStateApplyEvent):
+                current = self.rbac_state_manager.get_state()
                 if current and event.version < current.version:
-                    logger.warning("skipping remote event application because user state version regressed: event_id={} error=user_state version regressed", event.event_id)
-                else:
-                    self.user_state_manager.replace_state(event.user_state)
-                    logger.info(
-                        "applied remote user-state event event_id={} user_state_version={}",
+                    logger.warning(
+                        "skipping remote event application because rbac state version regressed: event_id={} error=rbac_state version regressed",
                         event.event_id,
-                        event.user_state.version,
                     )
+                else:
+                    self.rbac_state_manager.replace_state(event.rbac_state)
+                    logger.info("applied remote rbac-state event event_id={} rbac_state_version={}", event.event_id, event.rbac_state.version)
             elif isinstance(event, GroupNodeJoinedEvent):
                 state = self.state_manager.require_state()
                 control_planes = [item for item in state.control_planes if item.node_id != event.node.node_id]
@@ -302,7 +329,6 @@ class ControlPlaneEventManager:
                 runtimes = event.runtimes if event.runtimes is not None else state.runtimes
                 endpoints = event.endpoints if event.endpoints is not None else state.endpoints
                 node_statuses = event.node_statuses if event.node_statuses is not None else state.node_statuses
-
                 new_state = GroupState(
                     group_id=state.group_id,
                     version=event.version,
@@ -317,24 +343,11 @@ class ControlPlaneEventManager:
                     leader_signature=event.leader_signature,
                 )
                 self.state_manager.replace_state(new_state, trusted_leader_pubkey=trusted_leader_pubkey)
-            elif isinstance(event, UserUpsertedEvent):
-                state = self.user_state_manager.get_state()
-                users = [u for u in state.users if u.user_id != event.user.user_id]
-                users.append(event.user)
-                new_state = UserState(
-                    version=event.version,
-                    users=users,
-                    event_log=state.event_log,
-                )
-                self.user_state_manager.replace_state(new_state)
-            elif isinstance(event, UserEventAppendedEvent):
-                state = self.user_state_manager.get_state()
-                new_state = UserState(
-                    version=event.version,
-                    users=state.users,
-                    event_log=[*state.event_log, event.event],
-                )
-                self.user_state_manager.replace_state(new_state)
+            elif isinstance(event, ClusterAuditEventAppendedEvent):
+                pass
+            elif isinstance(event, UserStateApplyEvent | UserUpsertedEvent | UserEventAppendedEvent):
+                # Legacy compatibility: old user-state events are accepted but ignored.
+                logger.warning("ignoring legacy user-state sync event event_id={} type={}", event.event_id, type(event).__name__)
             else:
                 raise ControlPlaneEventSyncError(f"unsupported event type {type(event)!r}")
         except StateVersionRegressedError as exc:
@@ -343,12 +356,12 @@ class ControlPlaneEventManager:
                 event.event_id,
                 str(exc),
             )
-        except Exception as e:
-            if "version regressed" in str(e).lower():
+        except Exception as exc:
+            if "version regressed" in str(exc).lower():
                 logger.warning(
                     "skipping remote event application because state version regressed: event_id={} error={}",
                     event.event_id,
-                    str(e),
+                    str(exc),
                 )
             else:
                 raise

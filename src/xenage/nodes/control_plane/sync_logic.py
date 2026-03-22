@@ -81,6 +81,15 @@ class ControlPlaneSyncLogic:
             return None
 
         last_divergence_reason: str | None = None
+        initial_state = self.node.state_manager.get_state()
+        initial_state_fingerprint = None
+        if initial_state is not None:
+            initial_state_fingerprint = (
+                initial_state.version,
+                initial_state.leader_epoch,
+                initial_state.leader_node_id,
+                initial_state.leader_pubkey,
+            )
         for leader_url in urls:
             logger.info("sync_attempt leader_url={} node_id={}", leader_url, self.node.identity.node_id)
             if report_sync_status:
@@ -196,7 +205,20 @@ class ControlPlaneSyncLogic:
             if report_sync_status:
                 self.node.set_local_sync_status("synced")
                 await self.publish_sync_status(leader_url, "synced")
-            return self.node.state_manager.get_state()
+            if hasattr(self.node, "user_state_manager") and hasattr(self.node.user_state_manager, "refresh_from_canonical"):
+                self.node.user_state_manager.refresh_from_canonical()
+            current_state = self.node.state_manager.get_state()
+            if current_state is None:
+                return None
+            current_state_fingerprint = (
+                current_state.version,
+                current_state.leader_epoch,
+                current_state.leader_node_id,
+                current_state.leader_pubkey,
+            )
+            if current_state_fingerprint == initial_state_fingerprint:
+                return None
+            return current_state
 
         if last_divergence_reason is not None and (report_sync_status or raise_on_divergence):
             raise EventHistoryAheadError(last_divergence_reason)

@@ -24,9 +24,13 @@ package-dir = {"" = ".", "xenage" = "src/xenage"}
 packages = [
   "structures",
   "xenage",
+  "xenage.cli_ultimate",
   "xenage.app",
   "xenage.cluster",
   "xenage.network",
   "xenage.nodes",
+  "xenage.nodes.control_plane",
+  "xenage.nodes.control_plane.control_plane_api",
+  "xenage.nodes.runtime",
   "xenage.persistence",
 ]

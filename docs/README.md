@@ -8,6 +8,12 @@ This folder contains architecture and API docs for the Xenage control plane/runt
 - [Node Sync](sync-nodes.md)
 - [Events](events.md)
 - [Control Plane API](control-plane-api.md)
+- [RBAC Guide](rbac.md)
+
+## Practical Examples
+
+- [RBAC Agent Runner](examples/rbac/agent-runner.yaml)
+- [RBAC Viewer Readonly](examples/rbac/viewer-readonly.yaml)
 
 ## Auto-generated Structure Docs
 

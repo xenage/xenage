@@ -14,8 +14,9 @@ Both roles inherit from `BaseNode` and share:
 - Persistent node identity (`node_id`, role, key pair, endpoints)
 - Signed HTTP transport client
 - Local `GroupState` storage
-- Local user state storage
+- Local RBAC state storage
 - Core route handling primitives
+- Unified auth description used in request logs (`cluster` + `RBAC` summary)
 
 ## Control Plane Node
 
@@ -51,6 +52,10 @@ The active leader is required for:
 - Does not expose an inbound HTTP endpoint
 
 Runtime nodes do not mutate membership and do not emit control-plane sync events.
+Code layout uses package modules:
+
+- `src/xenage/nodes/control_plane/control_plane_api/*` for control-plane API routing/views/logic
+- `src/xenage/nodes/runtime/main.py` for `RuntimeNode`
 
 ## Identity and Trust
 

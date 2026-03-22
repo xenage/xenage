@@ -6,9 +6,9 @@ from loguru import logger
 
 from structures.resources.membership import GroupState, JoinRequest, JoinResponse, RequestAuth, StoredNodeIdentity
 
-from ..serialization import decode_value
-from ..network.http_transport import TransportError
-from .base import BaseNode
+from ...serialization import decode_value
+from ...network.http_transport import TransportError
+from ..base import BaseNode
 
 
 class RuntimeNode(BaseNode):

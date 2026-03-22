@@ -15,7 +15,7 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - platform: macos-latest
+          - platform: macos-13
             os: macos
             arch: x86_64
           - platform: macos-14
@@ -30,6 +30,9 @@ jobs:
           - platform: windows-latest
             os: windows
             arch: x86_64
+          - platform: windows-11-arm
+            os: windows
+            arch: aarch64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -46,6 +49,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
+      - name: show runner architecture
+        shell: bash
+        run: |
+          echo "runner.os=${{ runner.os }}"
+          echo "matrix.arch=${{ matrix.arch }}"
+          uname -a
+          uname -m
 
       - name: install build dependencies
         run: |

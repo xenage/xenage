@@ -4,6 +4,7 @@ import asyncio
 from typing import TypeVar, TYPE_CHECKING
 
 import aiohttp
+import msgspec
 
 from structures.resources.membership import (
     GuiClusterSnapshot, 
@@ -93,6 +94,9 @@ class ControlPlaneClient:
     def fetch_cluster_events(self, limit: int = 10, before_sequence: int | None = None) -> GuiEventPage:
         return asyncio.run(self.get_events(limit=limit, before_sequence=before_sequence))
 
+    def fetch_current_state(self) -> GroupState:
+        return asyncio.run(self.get_current_state())
+
     async def _signed_request(
         self, 
         method: str, 
@@ -129,6 +133,37 @@ class ControlPlaneClient:
 
         raise TransportError(str(last_error) if last_error else "no control-plane urls configured")
 
+    async def _signed_request_json(self, method: str, path: str, body: bytes = b"") -> dict[str, object]:
+        timestamp = int(utc_now().timestamp())
+        nonce = make_nonce()
+        payload = SignedTransportClient.signature_payload(method, path, timestamp, nonce, body)
+        signature = self.key_pair.sign(payload)
+        headers = {
+            "x-node-id": self.config.user_id,
+            "x-timestamp": str(timestamp),
+            "x-nonce": nonce,
+            "x-signature": signature,
+            "x-public-key": self.config.public_key,
+            "content-type": "application/json",
+        }
+
+        timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
+        last_error: Exception | None = None
+        for base_url in self.config.control_plane_urls:
+            url = f"{base_url.rstrip('/')}{path}"
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.request(method, url, headers=headers, data=body) as response:
+                        response_body = await response.read()
+                        if response.status == 200:
+                            return msgspec.json.decode(response_body, type=dict[str, object])
+                        raise TransportError(SignedTransportClient._extract_error(response_body, response.reason))
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        raise TransportError(str(last_error) if last_error else "no control-plane urls configured")
+
     async def get_cluster_snapshot(self) -> GuiClusterSnapshot:
         return await self._signed_request("GET", "/v1/gui/cluster", GuiClusterSnapshot)
 
@@ -140,3 +175,38 @@ class ControlPlaneClient:
 
     async def get_current_state(self) -> GroupState:
         return await self._signed_request("GET", "/v1/state/current", GroupState)
+
+    def apply_manifest(self, manifest: dict[str, object]) -> dict[str, object]:
+        return asyncio.run(self.apply_manifest_async(manifest))
+
+    async def apply_manifest_async(self, manifest: dict[str, object]) -> dict[str, object]:
+        return await self._signed_request_json("POST", "/v1/resources/apply", msgspec.json.encode(manifest))
+
+    def can_i(self, verb: str, resource: str, namespace: str) -> dict[str, object]:
+        return asyncio.run(self.can_i_async(verb, resource, namespace))
+
+    async def can_i_async(self, verb: str, resource: str, namespace: str) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "verb": verb,
+            "resource": resource,
+            "namespace": namespace,
+        }
+        return await self._signed_request_json("POST", "/v1/auth/can-i", msgspec.json.encode(payload))
+
+    def fetch_resources(self, resource: str, namespace: str) -> list[dict[str, object]]:
+        return asyncio.run(self.fetch_resources_async(resource, namespace))
+
+    async def fetch_resources_async(self, resource: str, namespace: str) -> list[dict[str, object]]:
+        path = f"/v1/resources/{resource}?namespace={namespace}"
+        page = await self._signed_request_json("GET", path)
+        items = page.get("items", [])
+        if isinstance(items, list):
+            values: list[dict[str, object]] = []
+            index = 0
+            while index < len(items):
+                item = items[index]
+                if isinstance(item, dict):
+                    values.append(item)
+                index += 1
+            return values
+        return []

@@ -21,6 +21,7 @@ from .nodes.control_plane import ControlPlaneNode
 from .nodes.runtime import RuntimeNode
 from .serialization import decode_value, encode_value
 from .crypto import Ed25519KeyPair
+from .cli_ultimate.main import xenage_cli_main as xenage_cli_main_ultimate
 
 
 def _namespace_value(args: argparse.Namespace, key: str) -> object | None:
@@ -292,48 +293,4 @@ def runtime_main() -> None:
 
 
 def xenage_cli_main() -> None:
-    parser = argparse.ArgumentParser(prog="xenage")
-    parser.add_argument("--config", help="Path to cluster connection config (yaml)")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    get_parser = subparsers.add_parser("get")
-    get_parser.add_argument("resource", choices=["nodes", "group-config", "events", "state"])
-    get_parser.add_argument("--limit", type=int, default=50)
-
-    args = parser.parse_args()
-
-    config_path = args.config
-    if not config_path:
-        default_path = Path.home() / ".xenage" / "config.yaml"
-        if default_path.exists():
-            config_path = str(default_path)
-        else:
-            print("Error: --config not provided and ~/.xenage/config.yaml not found")
-            return
-
-    client = ControlPlaneClient.from_yaml(config_path)
-
-    if args.command == "get":
-        if args.resource == "nodes":
-            snapshot = asyncio.run(client.get_cluster_snapshot())
-            print(f"{'NODE_ID':<20} {'ROLE':<15} {'STATUS':<15} {'ENDPOINT':<30}")
-            for node in snapshot.nodes:
-                endpoint = node.endpoints[0] if node.endpoints else "-"
-                status = node.status
-                if node.leader:
-                    status += " (leader)"
-                print(f"{node.node_id:<20} {node.role:<15} {status:<15} {endpoint:<30}")
-
-        elif args.resource == "group-config":
-            state = asyncio.run(client.get_current_state())
-            print(state.config.dump_yaml())
-
-        elif args.resource == "events":
-            page = asyncio.run(client.get_events(limit=args.limit))
-            print(f"{'SEQ':<10} {'TIMESTAMP':<25} {'EVENT_TYPE':<30} {'USER'}")
-            for event in page.items:
-                print(f"{event.sequence:<10} {event.timestamp:<25} {event.event_type:<30} {event.user_id}")
-
-        elif args.resource == "state":
-            state = asyncio.run(client.get_current_state())
-            print(state.dump_json())
+    xenage_cli_main_ultimate()

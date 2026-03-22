@@ -1,0 +1,30 @@
+apiVersion: xenage.dev/v1
+kind: ServiceAccount
+metadata:
+  name: viewer
+spec:
+  engine: gui/v1
+  publicKey: REPLACE_WITH_BASE64_PUBLIC_KEY
+  enabled: true
+---
+apiVersion: rbac.authorization.xenage.dev/v1
+kind: Role
+metadata:
+  name: viewer-role
+rules:
+  - apiGroups: [""]
+    namespaces: ["cluster"]
+    resources: ["nodes", "events"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.xenage.dev/v1
+kind: RoleBinding
+metadata:
+  name: viewer-binding
+subjects:
+  - kind: ServiceAccount
+    name: viewer
+roleRef:
+  apiGroup: rbac.authorization.xenage.dev
+  kind: Role
+  name: viewer-role

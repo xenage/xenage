@@ -1,0 +1,30 @@
+apiVersion: xenage.dev/v1
+kind: ServiceAccount
+metadata:
+  name: agent-runner
+spec:
+  engine: runtime/v1
+  publicKey: REPLACE_WITH_BASE64_PUBLIC_KEY
+  enabled: true
+---
+apiVersion: rbac.authorization.xenage.dev/v1
+kind: Role
+metadata:
+  name: agent-runner-role
+rules:
+  - apiGroups: [""]
+    namespaces: ["ai"]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.xenage.dev/v1
+kind: RoleBinding
+metadata:
+  name: agent-runner-binding
+subjects:
+  - kind: ServiceAccount
+    name: agent-runner
+roleRef:
+  apiGroup: rbac.authorization.xenage.dev
+  kind: Role
+  name: agent-runner-role

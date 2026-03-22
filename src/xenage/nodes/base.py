@@ -7,8 +7,8 @@ from loguru import logger
 from structures.resources.membership import NodeRecord, RequestAuth, StoredNodeIdentity
 
 from ..crypto import Ed25519KeyPair
+from ..cluster.rbac_state_manager import RbacStateManager
 from ..cluster.state_manager import StateManager
-from ..cluster.user_state_manager import UserStateManager
 from ..network.http_transport import HTTPNodeProtocol, SignedTransportClient, TransportError
 from ..persistence.storage_layer import StorageLayer
 
@@ -27,7 +27,7 @@ class BaseNode(HTTPNodeProtocol):
         self.role = role
         self.storage = StorageLayer(storage_path)
         self.state_manager = StateManager(self.storage)
-        self.user_state_manager = UserStateManager(self.storage)
+        self.rbac_state_manager = RbacStateManager(self.storage)
         existing_identity = self.storage.load_identity()
         if existing_identity is None:
             key_pair = Ed25519KeyPair.generate()
@@ -82,6 +82,30 @@ class BaseNode(HTTPNodeProtocol):
         else:
             logger.debug("request_signer_not_in_group node_id={} public_key={}", auth.node_id, public_key)
 
+    def describe_auth(self, auth: RequestAuth, public_key: str) -> str:
+        state = self.state_manager.get_state()
+        cluster_part = "cluster=unknown"
+        if state is None:
+            cluster_part = "cluster=state_uninitialized"
+        else:
+            control_plane_keys = {item.node_id: item.public_key for item in state.control_planes}
+            runtime_keys = {item.node_id: item.public_key for item in state.runtimes}
+            if auth.node_id in control_plane_keys:
+                cluster_part = (
+                    f"cluster=control-plane node_id={auth.node_id} "
+                    f"key_match={control_plane_keys[auth.node_id] == public_key}"
+                )
+            elif auth.node_id in runtime_keys:
+                cluster_part = (
+                    f"cluster=runtime node_id={auth.node_id} "
+                    f"key_match={runtime_keys[auth.node_id] == public_key}"
+                )
+            else:
+                cluster_part = f"cluster=external node_id={auth.node_id}"
+
+        rbac_part = self.rbac_state_manager.describe_auth_subject(auth.node_id, public_key)
+        return f"{cluster_part}; {rbac_part}"
+
     async def handle_request(
         self,
         method: str,
@@ -90,9 +114,17 @@ class BaseNode(HTTPNodeProtocol):
         auth: RequestAuth,
         public_key: str,
     ) -> dict[str, str]:
-        logger.debug("handling node request method={} path={} node_id={}", method, path, self.identity.node_id)
+        logger.debug(
+            "handling node request method={} path={} local_node_id={} auth_node_id={} signed={}",
+            method,
+            path,
+            self.identity.node_id,
+            auth.node_id,
+            bool(public_key),
+        )
         if public_key:
             self.verify_known_signer(auth, public_key)
         if method == "GET" and path == "/v1/heartbeat":
+            logger.trace("heartbeat handled local_node_id={} auth_node_id={}", self.identity.node_id, auth.node_id)
             return {"status": "ok", "node_id": self.identity.node_id}
         raise TransportError(f"unsupported route {method} {path}")

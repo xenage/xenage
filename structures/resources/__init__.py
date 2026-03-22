@@ -41,11 +41,22 @@ from .events import (
     ControlPlaneSyncEventBase,
     GuiClusterSnapshotReadEvent,
     GroupStateApplyEvent,
+    RbacStateApplyEvent,
     RbacAdminUserUpsertEvent,
     UserStateApplyEvent,
 )
 from .manifest import NAVIGATION, RESOURCE_TYPES, build_release_manifest
 from .observability import Event
+from .rbac import (
+    PolicyRule,
+    RbacState,
+    Role,
+    RoleBinding,
+    RoleRef,
+    ServiceAccount,
+    ServiceAccountSpec,
+    Subject,
+)
 
 __all__ = [
     "ResourceDocument",
@@ -88,10 +99,19 @@ __all__ = [
     "ControlPlaneSyncEventBase",
     "GroupStateApplyEvent",
     "UserStateApplyEvent",
+    "RbacStateApplyEvent",
     "ControlPlaneSyncEvent",
     "ControlPlaneEventLog",
     "ControlPlaneEventPage",
     "NAVIGATION",
     "RESOURCE_TYPES",
     "build_release_manifest",
+    "ServiceAccountSpec",
+    "ServiceAccount",
+    "PolicyRule",
+    "Role",
+    "Subject",
+    "RoleRef",
+    "RoleBinding",
+    "RbacState",
 ]

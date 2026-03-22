@@ -21,6 +21,7 @@ from structures.resources.membership import (
 )
 
 from ...cluster.control_plane_event_manager import ControlPlaneEventManager
+from ...cluster.user_state_compat import UserStateCompat
 from ...cluster.time_utils import format_timestamp, utc_now
 from ...network.http_transport import TransportError
 from ...tokens import BootstrapTokenManager
@@ -29,7 +30,7 @@ from ..base import BaseNode
 from .utils import sort_control_planes
 from .sync_logic import ControlPlaneSyncLogic
 from .state_logic import ControlPlaneStateLogic
-from .urls_logic import ControlPlaneUrlsLogic
+from .control_plane_api.urls_logic import ControlPlaneUrlsLogic
 
 
 class ControlPlaneNode(BaseNode):
@@ -51,7 +52,8 @@ class ControlPlaneNode(BaseNode):
         self.sync_status_by_node: dict[str, GroupNodeSyncStatus] = {}
         self.broken_sync_reason = ""
         
-        self.event_manager = ControlPlaneEventManager(self.storage, self.state_manager, self.user_state_manager)
+        self.event_manager = ControlPlaneEventManager(self.storage, self.state_manager, self.rbac_state_manager)
+        self.user_state_manager = UserStateCompat(self)
         
         self.sync_logic = ControlPlaneSyncLogic(self)
         self.state_logic = ControlPlaneStateLogic(self)

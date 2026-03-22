@@ -164,11 +164,31 @@ class RequestVerifier:
 
     def verify(self, method: str, path: str, body: bytes, auth: RequestAuth, public_key: str) -> None:
         now = int(utc_now().timestamp())
+        logger.trace(
+            "signature_verify_start method={} path={} node_id={} timestamp={} now={} nonce={} body_bytes={}",
+            method,
+            path,
+            auth.node_id,
+            auth.timestamp,
+            now,
+            auth.nonce,
+            len(body),
+        )
         self._prune(now)
         if abs(now - auth.timestamp) > MAX_CLOCK_SKEW_SECONDS:
+            logger.warning(
+                "request_timestamp_skew method={} path={} node_id={} timestamp={} now={} max_skew={}",
+                method,
+                path,
+                auth.node_id,
+                auth.timestamp,
+                now,
+                MAX_CLOCK_SKEW_SECONDS,
+            )
             raise TransportError("request timestamp is outside the allowed skew")
         nonce_key = f"{auth.node_id}:{auth.nonce}"
         if nonce_key in self._seen_nonce_at:
+            logger.warning("request_nonce_replay_detected method={} path={} node_id={} nonce={}", method, path, auth.node_id, auth.nonce)
             raise TransportError("request nonce was already used")
         payload = SignedTransportClient.signature_payload(method, path, auth.timestamp, auth.nonce, body)
         if not verify_signature(public_key, payload, auth.signature):
@@ -192,6 +212,16 @@ class NodeHTTPServer:
         self._shutdown_requested = threading.Event()
         logger.debug("http server initialized host={} port={} node_type={}", host, port, type(node).__name__)
 
+    def _auth_by(self, auth: RequestAuth, public_key: str) -> str:
+        describe_auth = getattr(self.node, "describe_auth", None)
+        if not callable(describe_auth):
+            return "auth=unavailable"
+        try:
+            return str(describe_auth(auth, public_key))
+        except Exception as exc:
+            logger.debug("auth_describe_failed node_id={} reason={}", auth.node_id, exc)
+            return "auth=unavailable"
+
     async def _handle(self, request: web.Request) -> web.Response:
         method = request.method
         raw_path = request.raw_path
@@ -204,16 +234,49 @@ class NodeHTTPServer:
         )
         public_key = request.headers.get("x-public-key", "")
         
-        # Log request at INFO level for visibility, DEBUG for details
-        logger.info("request_received method={} path={} node_id={} public_key={} body_len={}", 
-                    method, raw_path, auth.node_id, public_key, len(body))
-        
+        logger.info(
+            "request_received method={} path={} node_id={} signed={} body_len={}",
+            method,
+            raw_path,
+            auth.node_id,
+            bool(public_key),
+            len(body),
+        )
+
         if len(body) < 4096:
-             logger.trace("request_body method={} path={} body={!r}", method, raw_path, body)
+            logger.trace("request_body method={} path={} body={!r}", method, raw_path, body)
+        else:
+            logger.trace("request_body method={} path={} body_len={}", method, raw_path, len(body))
 
         try:
             if public_key:
                 self.verifier.verify(method, raw_path, body, auth, public_key)
+                auth_by = self._auth_by(auth, public_key)
+                logger.info(
+                    "signed_request_verified method={} path={} node_id={} Signed BY: {} Auth by: {}",
+                    method,
+                    raw_path,
+                    auth.node_id,
+                    public_key,
+                    auth_by,
+                )
+                logger.debug(
+                    "signed_request_metadata method={} path={} node_id={} timestamp={} nonce={}",
+                    method,
+                    raw_path,
+                    auth.node_id,
+                    auth.timestamp,
+                    auth.nonce,
+                )
+            else:
+                logger.warning(
+                    "unsigned_request_received method={} path={} node_id={} nonce={} signature_present={}",
+                    method,
+                    raw_path,
+                    auth.node_id,
+                    auth.nonce,
+                    bool(auth.signature),
+                )
             
             response = await self.node.handle_request(method, raw_path, body, auth, public_key)
             
@@ -223,7 +286,13 @@ class NodeHTTPServer:
 
             payload = encode_value(response)
             
-            logger.info("request_success method={} path={} node_id={} status=200", method, raw_path, auth.node_id)
+            logger.info(
+                "request_success method={} path={} node_id={} status=200 response_bytes={}",
+                method,
+                raw_path,
+                auth.node_id,
+                len(payload),
+            )
             if len(payload) < 4096:
                 logger.debug("response_body method={} path={} body={!r}", method, raw_path, payload)
             else:
@@ -231,11 +300,29 @@ class NodeHTTPServer:
 
             return web.Response(status=HTTPStatus.OK, body=payload, content_type="application/json")
         except TransportError as exc:
-            logger.warning("request_rejected method={} path={} node_id={} reason={}", method, raw_path, auth.node_id, exc)
+            auth_by = self._auth_by(auth, public_key) if public_key else "auth=unsigned"
+            logger.warning(
+                "request_rejected method={} path={} node_id={} Signed BY: {} Auth by: {} reason={}",
+                method,
+                raw_path,
+                auth.node_id,
+                public_key or "-",
+                auth_by,
+                exc,
+            )
             payload = encode_value({"error": str(exc)})
             return web.Response(status=HTTPStatus.UNAUTHORIZED, body=payload, content_type="application/json")
         except Exception as exc:
-            logger.exception("request_failed method={} path={} node_id={} reason={}", method, raw_path, auth.node_id, exc)
+            auth_by = self._auth_by(auth, public_key) if public_key else "auth=unsigned"
+            logger.exception(
+                "request_failed method={} path={} node_id={} Signed BY: {} Auth by: {} reason={}",
+                method,
+                raw_path,
+                auth.node_id,
+                public_key or "-",
+                auth_by,
+                exc,
+            )
             payload = encode_value({"error": str(exc)})
             return web.Response(status=HTTPStatus.INTERNAL_SERVER_ERROR, body=payload, content_type="application/json")
 

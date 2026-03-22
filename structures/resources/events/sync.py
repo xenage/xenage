@@ -5,6 +5,7 @@ from typing import TypeAlias, Literal
 
 from ...base import Structure
 from ..membership import GroupState, GroupNodeSyncStatus, UserState, NodeRecord, GroupEndpoint, UserRecord, EventLogEntry
+from ..rbac import RbacState
 
 
 class ControlPlaneSyncEventBase(Structure, tag_field="event_type", kw_only=True):
@@ -24,6 +25,12 @@ class GroupStateApplyEvent(ControlPlaneSyncEventBase, tag="group_state.apply"):
 class UserStateApplyEvent(ControlPlaneSyncEventBase, tag="user_state.apply"):
     kind = "UserStateApplyEvent"
     user_state: UserState
+    version: int
+
+
+class RbacStateApplyEvent(ControlPlaneSyncEventBase, tag="rbac_state.apply"):
+    kind = "RbacStateApplyEvent"
+    rbac_state: RbacState
     version: int
 
 
@@ -76,15 +83,22 @@ class UserEventAppendedEvent(ControlPlaneSyncEventBase, tag="user.event_appended
     version: int
 
 
+class ClusterAuditEventAppendedEvent(ControlPlaneSyncEventBase, tag="cluster.audit.event_appended"):
+    kind = "ClusterAuditEventAppendedEvent"
+    event: EventLogEntry
+
+
 ControlPlaneSyncEvent: TypeAlias = (
     GroupStateApplyEvent
     | UserStateApplyEvent
+    | RbacStateApplyEvent
     | GroupNodeJoinedEvent
     | GroupNodeRevokedEvent
     | GroupEndpointsUpdatedEvent
     | GroupLeaderPromotedEvent
     | UserUpsertedEvent
     | UserEventAppendedEvent
+    | ClusterAuditEventAppendedEvent
 )
 
 

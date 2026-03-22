@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - platform: macos-latest
+          - platform: macos-13
             os: macos
             arch: x86_64
           - platform: macos-14
@@ -31,6 +31,9 @@ jobs:
           - platform: windows-latest
             os: windows
             arch: x86_64
+          - platform: windows-11-arm
+            os: windows
+            arch: aarch64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -97,6 +100,53 @@ jobs:
         run: yarn tauri build
         working-directory: apps/xenage-gui
 
+      - name: verify updater artifacts (post-build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="apps/xenage-gui/src-tauri/target/release/bundle"
+          latest_count="$(find "${bundle_dir}" -type f -name latest.json | wc -l | tr -d ' ')"
+          if [ "${latest_count}" = "0" ]; then
+            echo "No updater metadata (latest.json) was generated under ${bundle_dir}" >&2
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const root = path.resolve('apps/xenage-gui/src-tauri/target/release/bundle');
+          const latestFiles = [];
+
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                walk(full);
+              } else if (entry.isFile() && entry.name === 'latest.json') {
+                latestFiles.push(full);
+              }
+            }
+          }
+
+          walk(root);
+          if (latestFiles.length === 0) {
+            throw new Error('No latest.json files found after build.');
+          }
+
+          for (const file of latestFiles) {
+            const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (!payload.platforms || typeof payload.platforms !== 'object') {
+              throw new Error(`Updater manifest ${file} does not contain "platforms".`);
+            }
+            if (Object.keys(payload.platforms).length === 0) {
+              throw new Error(`Updater manifest ${file} has an empty "platforms" map.`);
+            }
+          }
+
+          console.log(`Validated ${latestFiles.length} updater manifest(s).`);
+          NODE
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +157,10 @@ jobs:
             apps/xenage-gui/src-tauri/target/release/bundle/dmg/*.dmg
             apps/xenage-gui/src-tauri/target/release/bundle/deb/*.deb
             apps/xenage-gui/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/xenage-gui/src-tauri/target/release/bundle/**/*.tar.gz
             apps/xenage-gui/src-tauri/target/release/bundle/**/*.zip
+            apps/xenage-gui/src-tauri/target/release/bundle/**/*.sig
+            apps/xenage-gui/src-tauri/target/release/bundle/**/latest.json
 
       - name: Save Tauri build cache
         if: success() && github.event_name != 'pull_request'
@@ -214,7 +267,126 @@ jobs:
             exit 1
           fi
 
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const root = path.resolve('dist/gui-release');
+          const repo = process.env.REPO;
+          const releaseTag = process.env.RELEASE_TAG;
+          const latestOutput = path.resolve('/tmp/latest.json');
+          const updaterListOutput = path.resolve('/tmp/updater-assets.txt');
+          const skippedLatestOutput = path.resolve('/tmp/skipped-latest-source-files.txt');
+
+          const allFiles = [];
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                walk(full);
+              } else if (entry.isFile()) {
+                allFiles.push(full);
+              }
+            }
+          }
+          walk(root);
+
+          const byBase = new Map();
+          for (const file of allFiles) {
+            const base = path.basename(file);
+            if (!byBase.has(base)) {
+              byBase.set(base, []);
+            }
+            byBase.get(base).push(file);
+          }
+
+          const latestFiles = allFiles.filter((file) => path.basename(file) === 'latest.json');
+          if (latestFiles.length === 0) {
+            throw new Error('No latest.json files found in downloaded artifacts.');
+          }
+
+          const firstManifest = JSON.parse(fs.readFileSync(latestFiles[0], 'utf8'));
+          const merged = {
+            version: firstManifest.version,
+            notes: firstManifest.notes,
+            pub_date: firstManifest.pub_date,
+            platforms: {},
+          };
+
+          const updaterAssetPaths = new Set();
+          for (const manifestPath of latestFiles) {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            const platforms = manifest.platforms ?? {};
+
+            for (const [target, payload] of Object.entries(platforms)) {
+              const rawUrl = payload && typeof payload.url === 'string' ? payload.url : '';
+              if (!rawUrl) {
+                throw new Error(`Missing updater URL for target ${target} in ${manifestPath}`);
+              }
+
+              let fileName;
+              try {
+                fileName = path.basename(new URL(rawUrl).pathname);
+              } catch (_) {
+                fileName = path.basename(rawUrl);
+              }
+
+              const candidates = byBase.get(fileName) || [];
+              if (candidates.length === 0) {
+                throw new Error(`Updater payload ${fileName} referenced by ${manifestPath} was not found.`);
+              }
+
+              const manifestDir = path.dirname(manifestPath);
+              const preferred = candidates.find((candidate) => candidate.startsWith(manifestDir))
+                || candidates[0];
+              updaterAssetPaths.add(preferred);
+
+              merged.platforms[target] = {
+                ...payload,
+                url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
+              };
+            }
+          }
+
+          if (Object.keys(merged.platforms).length === 0) {
+            throw new Error('Merged updater manifest has no platform entries.');
+          }
+
+          fs.writeFileSync(latestOutput, `${JSON.stringify(merged, null, 2)}\n`);
+          fs.writeFileSync(updaterListOutput, `${[...updaterAssetPaths].sort().join('\n')}\n`);
+          fs.writeFileSync(skippedLatestOutput, `${latestFiles.sort().join('\n')}\n`);
+          console.log(`Merged ${latestFiles.length} updater manifests into ${latestOutput}.`);
+          NODE
+
+          declare -A updater_assets
+          if [ -f /tmp/updater-assets.txt ]; then
+            while IFS= read -r line; do
+              [ -n "${line}" ] || continue
+              updater_assets["${line}"]=1
+            done < /tmp/updater-assets.txt
+          fi
+
+          declare -A skip_latest
+          if [ -f /tmp/skipped-latest-source-files.txt ]; then
+            while IFS= read -r line; do
+              [ -n "${line}" ] || continue
+              skip_latest["${line}"]=1
+            done < /tmp/skipped-latest-source-files.txt
+          fi
+
           for file in "${files[@]}"; do
+            if [ -n "${skip_latest["${file}"]+x}" ]; then
+              continue
+            fi
+
+            if [ -n "${updater_assets["${file}"]+x}" ]; then
+              base="$(basename "${file}")"
+              upload_path="/tmp/${base}"
+              cp "${file}" "${upload_path}"
+              gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
+              continue
+            fi
+
             rel="${file#dist/gui-release/}"
             artifact_dir="${rel%%/*}"
             base="$(basename "${file}")"
@@ -246,3 +418,5 @@ jobs:
             cp "${file}" "${upload_path}"
             gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}"
           done
+
+          gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}"

@@ -1,0 +1,49 @@
+services:
+  control-plane-1:
+    image: xenage:local
+    command: ["sh", "-lc", "sleep infinity"]
+    volumes:
+      - cp1-data:/data/cp-1
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:8734:8734"
+
+  control-plane-2:
+    image: xenage:local
+    command: ["sh", "-lc", "sleep infinity"]
+    volumes:
+      - cp2-data:/data/cp-2
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:18734:8736"
+
+  control-plane-3:
+    image: xenage:local
+    command: ["sh", "-lc", "sleep infinity"]
+    volumes:
+      - cp3-data:/data/cp-3
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:28734:8737"
+
+  runtime-1:
+    image: xenage:local
+    command: ["sh", "-lc", "sleep infinity"]
+    volumes:
+      - rt1-data:/data/rt-1
+      - shared-artifacts:/shared
+
+  runtime-2:
+    image: xenage:local
+    command: ["sh", "-lc", "sleep infinity"]
+    volumes:
+      - rt2-data:/data/rt-2
+      - shared-artifacts:/shared
+
+volumes:
+  cp1-data:
+  cp2-data:
+  cp3-data:
+  rt1-data:
+  rt2-data:
+  shared-artifacts:

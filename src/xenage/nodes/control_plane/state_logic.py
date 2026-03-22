@@ -246,19 +246,16 @@ class ControlPlaneStateLogic:
     def ensure_admin_user(self, user_id: str, public_key: str) -> UserRecord:
         if not self.node.is_leader():
             logger.debug("skip ensure_admin_user: node is not the active leader node_id={}", self.node.identity.node_id)
-            return self.node.user_state_manager.ensure_admin(user_id, public_key, read_only=True)
+            return self.node.rbac_state_manager.ensure_admin_user(user_id, public_key, read_only=True)
 
-        existing = self.node.user_state_manager.find_user(user_id)
+        existing = self.node.rbac_state_manager.find_service_account(user_id)
         if existing is not None:
-            return self.node.user_state_manager.ensure_admin(user_id, public_key)
+            return self.node.rbac_state_manager.ensure_admin_user(user_id, public_key, read_only=True)
 
-        user = self.node.user_state_manager.ensure_admin(user_id, public_key)
-        state = self.node.user_state_manager.get_state()
-        
-        # Diff event
+        state = self.node.rbac_state_manager.ensure_admin_bundle(user_id, public_key, "gui/v1")
+        self.node.event_manager.record_rbac_state(self.node.identity.node_id, state)
+        user = self.node.rbac_state_manager.ensure_admin_user(user_id, public_key, read_only=True)
         self.node.event_manager.record_user_upserted(self.node.identity.node_id, user, state.version)
-        
-        # Audit event
         self.node.append_cluster_event(RbacAdminUserUpsertEvent(user_id=user_id))
         return user
 
@@ -275,17 +272,17 @@ class ControlPlaneStateLogic:
                          self.node.identity.node_id, event.action())
             return
 
-        updated = self.node.user_state_manager.append_event(
+        sync_event = self.node.event_manager.record_cluster_audit_event(
             self.node.identity.node_id,
             "node",
             event.action(),
             event.details(),
         )
-        # Diff event
+        projected = self.node.storage.load_user_state()
         self.node.event_manager.record_user_event_appended(
-            self.node.identity.node_id, 
-            updated.event_log[-1], 
-            updated.version
+            self.node.identity.node_id,
+            sync_event.event,
+            projected.version,
         )
 
     async def check_failover(self, ttl_seconds: int) -> GroupState | None:
