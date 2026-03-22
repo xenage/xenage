@@ -24,7 +24,7 @@ jobs:
           - platform: ubuntu-22.04
             os: linux
             arch: x86_64
-          - platform: ubuntu-24.04-arm
+          - platform: ubuntu-22.04-arm
             os: linux
             arch: aarch64
           - platform: windows-latest
@@ -48,7 +48,7 @@ jobs:
       - name: setup python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.os == 'windows' && matrix.arch == 'aarch64' && '3.12' || '3.13' }}
 
       - name: show runner architecture
         shell: bash
