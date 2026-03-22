@@ -86,6 +86,24 @@ jobs:
         run: |
           python scripts/build_standalone.py --version "${{ steps.release_meta.outputs.release_version }}"
 
+      - name: sign standalone artifacts
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          artifacts=(dist/standalone-release/*)
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "No standalone artifacts were produced to sign." >&2
+            exit 1
+          fi
+          for artifact in "${artifacts[@]}"; do
+            [ -f "${artifact}" ] || continue
+            npx --yes @tauri-apps/cli@2.10.1 signer sign "${artifact}"
+          done
+
       - name: verify standalone binaries (post-build)
         shell: bash
         run: |
@@ -177,6 +195,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
         shell: bash
         run: |
           files=()
@@ -187,11 +206,89 @@ jobs:
             echo "No files found in dist/standalone-release to upload" >&2
             exit 1
           fi
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const root = path.resolve('dist/standalone-release');
+          const repo = process.env.REPO;
+          const releaseTag = process.env.RELEASE_TAG;
+          const releaseVersion = process.env.RELEASE_VERSION;
+          const latestOutput = path.resolve('/tmp/latest.json');
+
+          const allFiles = fs.readdirSync(root)
+            .map((name) => path.join(root, name))
+            .filter((file) => fs.statSync(file).isFile());
+
+          const byBase = new Map();
+          for (const file of allFiles) {
+            byBase.set(path.basename(file), file);
+          }
+
+          function inferTargetFromAssetName(name) {
+            const lower = name.toLowerCase();
+            if (lower.startsWith('win_aarch_')) return 'windows-aarch64';
+            if (lower.startsWith('win_x86_')) return 'windows-x86_64';
+            if (lower.startsWith('mac_aarch_')) return 'darwin-aarch64';
+            if (lower.startsWith('mac_x86_')) return 'darwin-x86_64';
+            if (lower.startsWith('linux_aarch_')) return 'linux-aarch64';
+            if (lower.startsWith('linux_x86_')) return 'linux-x86_64';
+            return null;
+          }
+
+          const signatureFiles = allFiles
+            .filter((file) => file.endsWith('.sig'))
+            .sort();
+
+          if (signatureFiles.length === 0) {
+            throw new Error('No *.sig standalone artifacts found; latest.json cannot be generated.');
+          }
+
+          const latest = {
+            version: releaseVersion,
+            notes: '',
+            pub_date: new Date().toISOString(),
+            platforms: {},
+          };
+
+          for (const signaturePath of signatureFiles) {
+            const payloadName = path.basename(signaturePath).replace(/\.sig$/, '');
+            const payloadPath = byBase.get(payloadName);
+            if (!payloadPath) {
+              continue;
+            }
+
+            const target = inferTargetFromAssetName(payloadName);
+            if (!target) {
+              continue;
+            }
+
+            const signature = fs.readFileSync(signaturePath, 'utf8').trim();
+            if (!signature) {
+              throw new Error(`Signature file is empty: ${signaturePath}`);
+            }
+
+            latest.platforms[target] = {
+              signature,
+              url: `https://github.com/${repo}/releases/download/${releaseTag}/${payloadName}`,
+            };
+          }
+
+          if (Object.keys(latest.platforms).length === 0) {
+            throw new Error('No standalone platform/signature pairs were inferred for latest.json.');
+          }
+
+          fs.writeFileSync(latestOutput, `${JSON.stringify(latest, null, 2)}\n`);
+          console.log(`Generated standalone updater manifest: ${latestOutput}`);
+          NODE
+
           printf 'Standalone release files to upload:\n'
           for file in "${files[@]}"; do
             printf ' - %s\n' "${file}"
           done
           gh release upload "${RELEASE_TAG}" "${files[@]}" --repo "${REPO}" --clobber
+          gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}" --clobber
 
       - name: verify uploaded release assets
         env:

@@ -454,3 +454,148 @@ def test_api_lists_resources_for_authorized_subject(node: ControlPlaneNode) -> N
     )
     assert isinstance(response, dict)
     assert isinstance(response.get("items"), list)
+
+
+def test_api_deletes_role_via_apply_manifest_action(node: ControlPlaneNode) -> None:
+    admin_id, admin_key = _bootstrap_admin(node)
+    agent_key = Ed25519KeyPair.generate()
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "xenage.dev/v1",
+            "kind": "ServiceAccount",
+            "metadata": {"name": "agent"},
+            "spec": {"engine": "runtime/v1", "publicKey": agent_key.public_key_b64()},
+        },
+    )
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "Role",
+            "metadata": {"name": "agent-role"},
+            "rules": [{"apiGroups": [""], "namespaces": ["ai"], "resources": ["nodes"], "verbs": ["get"]}],
+        },
+    )
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "RoleBinding",
+            "metadata": {"name": "agent-binding"},
+            "subjects": [{"kind": "ServiceAccount", "name": "agent"}],
+            "roleRef": {"apiGroup": "rbac.authorization.xenage.dev", "kind": "Role", "name": "agent-role"},
+        },
+    )
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "ai")["allowed"] is True
+
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "Role",
+            "metadata": {
+                "name": "agent-role",
+                "annotations": {"xenage.io/action": "delete"},
+            },
+        },
+    )
+
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "ai")["allowed"] is False
+
+
+def test_api_deletes_rolebinding_via_apply_manifest_action(node: ControlPlaneNode) -> None:
+    admin_id, admin_key = _bootstrap_admin(node)
+    agent_key = Ed25519KeyPair.generate()
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "xenage.dev/v1",
+            "kind": "ServiceAccount",
+            "metadata": {"name": "agent"},
+            "spec": {"engine": "runtime/v1", "publicKey": agent_key.public_key_b64()},
+        },
+    )
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "Role",
+            "metadata": {"name": "agent-role"},
+            "rules": [{"apiGroups": [""], "namespaces": ["ai"], "resources": ["nodes"], "verbs": ["get"]}],
+        },
+    )
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "RoleBinding",
+            "metadata": {"name": "agent-binding"},
+            "subjects": [{"kind": "ServiceAccount", "name": "agent"}],
+            "roleRef": {"apiGroup": "rbac.authorization.xenage.dev", "kind": "Role", "name": "agent-role"},
+        },
+    )
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "ai")["allowed"] is True
+
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "rbac.authorization.xenage.dev/v1",
+            "kind": "RoleBinding",
+            "metadata": {
+                "name": "agent-binding",
+                "annotations": {"xenage.io/action": "delete"},
+            },
+        },
+    )
+
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "ai")["allowed"] is False
+
+
+def test_api_deletes_user_service_account_via_apply_manifest_action(node: ControlPlaneNode) -> None:
+    admin_id, admin_key = _bootstrap_admin(node)
+    agent_key = Ed25519KeyPair.generate()
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "xenage.dev/v1",
+            "kind": "ServiceAccount",
+            "metadata": {"name": "agent"},
+            "spec": {"engine": "runtime/v1", "publicKey": agent_key.public_key_b64()},
+        },
+    )
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "cluster")["allowed"] is False
+
+    _apply(
+        node,
+        admin_id,
+        admin_key,
+        {
+            "apiVersion": "xenage.dev/v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": "agent",
+                "annotations": {"xenage.io/action": "delete"},
+            },
+        },
+    )
+
+    assert _can_i(node, "agent", agent_key, "get", "nodes", "cluster")["allowed"] is False

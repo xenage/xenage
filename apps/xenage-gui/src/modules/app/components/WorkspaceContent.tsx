@@ -13,6 +13,7 @@ import { SetupGuideView } from "./SetupGuideView";
 import type { LogLevel } from "../../../services/logger";
 import type { StandaloneStatus } from "../../../services/standalone";
 import type { UpdateChannel } from "../../../services/update";
+import { RbacYamlEditor } from "../../rbac/RbacYamlEditor";
 
 type WorkspaceContentProps = {
   activeKind: string;
@@ -41,6 +42,13 @@ type WorkspaceContentProps = {
   onRetrySnapshot: () => void;
   onRuntimeArgsChange: (value: string) => void;
   onSetControlPlaneArgs: (value: string) => void;
+  onOpenRbacEditorTab: (payload: {
+    clusterId: string;
+    clusterYaml: string;
+    kind: string;
+    resourceName: string | null;
+    yaml: string;
+  }) => void;
   onStartStandaloneServices: () => Promise<void>;
   onStopStandaloneServices: () => Promise<void>;
   onTableSearchChange: (value: string) => void;
@@ -88,6 +96,7 @@ export function WorkspaceContent({
   onRetrySnapshot,
   onRuntimeArgsChange,
   onSetControlPlaneArgs,
+  onOpenRbacEditorTab,
   onStartStandaloneServices,
   onStopStandaloneServices,
   onTableSearchChange,
@@ -107,6 +116,8 @@ export function WorkspaceContent({
   usesSnapshotSource,
   warningMessage,
 }: WorkspaceContentProps) {
+  const rbacKindActive = activeKind === "User" || activeKind === "Role" || activeKind === "RoleBinding";
+
   return (
     <OverlayScrollbarsComponent
       className={`workspace__content scroll-host ${!settingsTabActive && !setupTabActive ? "workspace__content--compact" : ""}`}
@@ -162,7 +173,15 @@ export function WorkspaceContent({
           {warningMessage ? (
             <div className="workspace__warning">{warningMessage}</div>
           ) : null}
-          {activeKind === "Event" && tableSchema ? (
+          {rbacKindActive && tableSchema ? (
+            <RbacYamlEditor
+              activeKind={activeKind}
+              onOpenEditorTab={onOpenRbacEditorTab}
+              resolvedClusterId={resolvedClusterId}
+              searchTerm={tableSearch}
+              tableSchema={tableSchema}
+            />
+          ) : activeKind === "Event" && tableSchema ? (
             <EventTable
               hasMore={clusterEvents[resolvedClusterId]?.hasMore ?? false}
               loadingMore={clusterEvents[resolvedClusterId]?.loading ?? false}

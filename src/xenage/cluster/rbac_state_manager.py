@@ -8,6 +8,13 @@ from loguru import logger
 from structures.resources.membership import UserRecord, UserRoleBinding
 from structures.resources.rbac import PolicyRule, RbacState, Role, RoleBinding, RoleRef, ServiceAccount, ServiceAccountSpec, Subject
 
+from xenage.cluster.rbac_authorization import role_allows
+from xenage.cluster.rbac_mutations import (
+    delete_action_name,
+    delete_role,
+    delete_role_binding,
+    delete_service_account,
+)
 from xenage.network.http_transport import TransportError
 from xenage.persistence.storage_layer import StorageLayer
 
@@ -170,6 +177,34 @@ class RbacStateManager:
         api_version = str(manifest.get("apiVersion", ""))
         kind = str(manifest.get("kind", ""))
         self._ensure_cluster_wide_manifest(manifest)
+        delete_name = delete_action_name(manifest)
+
+        if delete_name is not None:
+            if api_version == "xenage.dev/v1" and kind == "ServiceAccount":
+                self.replace_state(delete_service_account(self.current, delete_name))
+                return {
+                    "kind": kind,
+                    "name": delete_name,
+                    "namespace": "cluster",
+                    "status": "deleted",
+                }
+            if api_version == "rbac.authorization.xenage.dev/v1" and kind == "Role":
+                self.replace_state(delete_role(self.current, delete_name))
+                return {
+                    "kind": kind,
+                    "name": delete_name,
+                    "namespace": "cluster",
+                    "status": "deleted",
+                }
+            if api_version == "rbac.authorization.xenage.dev/v1" and kind == "RoleBinding":
+                self.replace_state(delete_role_binding(self.current, delete_name))
+                return {
+                    "kind": kind,
+                    "name": delete_name,
+                    "namespace": "cluster",
+                    "status": "deleted",
+                }
+            raise TransportError("unsupported resource apiVersion/kind")
 
         if api_version == "xenage.dev/v1" and kind == "ServiceAccount":
             account = msgspec.convert(manifest, type=ServiceAccount)
@@ -237,7 +272,7 @@ class RbacStateManager:
         while index < len(bindings):
             binding = bindings[index]
             role = role_index.get(binding.roleRef.name)
-            if role is not None and self._role_allows(role, verb, resource, namespace):
+            if role is not None and role_allows(role, verb, resource, namespace):
                 return True
             index += 1
         return False
@@ -282,25 +317,6 @@ class RbacStateManager:
                 subject_index += 1
             index += 1
         return result
-
-    def _role_allows(self, role: Role, verb: str, resource: str, namespace: str) -> bool:
-        rule_index = 0
-        while rule_index < len(role.rules):
-            rule = role.rules[rule_index]
-            namespaces = rule.namespaces if rule.namespaces else ["*"]
-            if self._match(rule.verbs, verb) and self._match(rule.resources, resource) and self._match(namespaces, namespace):
-                return True
-            rule_index += 1
-        return False
-
-    def _match(self, values: list[str], expected: str) -> bool:
-        index = 0
-        while index < len(values):
-            value = values[index]
-            if value == "*" or value == expected:
-                return True
-            index += 1
-        return False
 
     def _service_account_to_user_record(self, account: ServiceAccount) -> UserRecord:
         return UserRecord(

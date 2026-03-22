@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import msgspec
-from typing import Literal
+from typing import Annotated, Literal
 
 from ..base import Structure
 from .base import ResourceDocument
@@ -24,11 +24,24 @@ class ServiceAccountSpec(Structure):
     enabled: bool = True
 
 
+class ServiceAccountStatus(Structure):
+    kind = "ServiceAccountStatus"
+    phase: str = "Active"
+
+
 class ServiceAccount(ResourceDocument):
     kind = "ServiceAccount"
     apiVersion: str = "xenage.dev/v1"
     metadata: RbacObjectMeta = RbacObjectMeta(name="default")
     spec: ServiceAccountSpec = ServiceAccountSpec(engine="runtime/v1", publicKey="")
+
+
+class User(ResourceDocument):
+    kind = "User"
+    apiVersion: str = "xenage.dev/v1"
+    metadata: RbacObjectMeta = RbacObjectMeta(name="default")
+    spec: ServiceAccountSpec = ServiceAccountSpec(engine="runtime/v1", publicKey="")
+    status: ServiceAccountStatus = ServiceAccountStatus()
 
 
 class PolicyRule(Structure):
@@ -73,3 +86,24 @@ class RbacState(Structure):
     serviceAccounts: list[ServiceAccount] = msgspec.field(default_factory=list)
     roles: list[Role] = msgspec.field(default_factory=list)
     roleBindings: list[RoleBinding] = msgspec.field(default_factory=list)
+
+
+class UserTableRow(Structure):
+    kind = "UserTableRow"
+    name: str
+    engine: str
+    enabled: bool
+    public_key: Annotated[str, "display_only"]
+
+
+class RoleTableRow(Structure):
+    kind = "RoleTableRow"
+    name: str
+    rule_count: int
+
+
+class RoleBindingTableRow(Structure):
+    kind = "RoleBindingTableRow"
+    name: str
+    role: str
+    subject_count: int

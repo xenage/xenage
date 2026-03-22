@@ -30,6 +30,9 @@ import {
   Terminal,
   Hammer,
   Activity,
+  Users,
+  Shield,
+  Link2,
 } from "lucide-react";
 
 export type IconName =
@@ -61,6 +64,9 @@ export type IconName =
   | "settings"
   | "session"
   | "tool"
+  | "user"
+  | "role"
+  | "roleBinding"
   | "usage";
 
 const icons: Record<IconName, React.ComponentType<LucideProps>> = {
@@ -92,6 +98,9 @@ const icons: Record<IconName, React.ComponentType<LucideProps>> = {
   settings: Settings,
   session: Terminal,
   tool: Hammer,
+  user: Users,
+  role: Shield,
+  roleBinding: Link2,
   usage: Activity,
 };
 
@@ -133,6 +142,9 @@ export function iconNameForItem(kind: string): IconName {
     ConfigHistory: "history",
     Alert: "alert",
     Usage: "usage",
+    User: "user",
+    Role: "role",
+    RoleBinding: "roleBinding",
   };
 
   return kindToIcon[kind] ?? "overview";

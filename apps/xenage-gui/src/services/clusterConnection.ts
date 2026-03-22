@@ -13,6 +13,13 @@ export interface StoredClusterUiPrefs {
   accent: string;
 }
 
+export interface RbacYamlResourceEntry {
+  kind: string;
+  name: string;
+  yaml: string;
+  manifest: Record<string, unknown>;
+}
+
 export class ClusterConnectionService {
   static async fetchSnapshotFromYaml(configYaml: string): Promise<GuiClusterSnapshot> {
     return invoke<GuiClusterSnapshot>("fetch_cluster_snapshot_from_yaml", { configYaml });
@@ -66,5 +73,27 @@ export class ClusterConnectionService {
 
   static async deleteClusterConnection(connectionId: string): Promise<void> {
     await invoke("delete_cluster_connection", { connectionId });
+  }
+
+  static async listRbacYamlResources(
+    configYaml: string,
+    kind: string,
+  ): Promise<RbacYamlResourceEntry[]> {
+    return invoke<RbacYamlResourceEntry[]>("list_rbac_yaml_resources_from_yaml", {
+      configYaml,
+      kind,
+    });
+  }
+
+  static async applyRbacYamlResource(
+    configYaml: string,
+    manifestYaml: string,
+    deleteMode: boolean,
+  ): Promise<Record<string, unknown>> {
+    return invoke<Record<string, unknown>>("apply_rbac_yaml_resource_from_yaml", {
+      configYaml,
+      manifestYaml,
+      deleteMode,
+    });
   }
 }

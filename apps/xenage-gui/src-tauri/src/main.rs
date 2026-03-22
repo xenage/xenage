@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cluster_connection;
+mod rbac_connection;
 
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,7 @@ use tauri_plugin_updater::UpdaterExt;
 use url::Url;
 
 use cluster_connection::{ClusterUiPrefsEntry, StoredClusterConnection};
+use rbac_connection::RbacYamlResourceEntry;
 
 const STABLE_UPDATE_ENDPOINT: &str =
     "https://github.com/xenage/xenage/releases/latest/download/latest.json";
@@ -881,6 +883,105 @@ async fn open_detached_tab_window(
 }
 
 #[tauri::command]
+async fn open_detached_horizontal_subwindow(
+    app: AppHandle,
+    source_url: String,
+    sub_window_kind: String,
+    tab_id: String,
+    tab_title: String,
+    tab_icon: String,
+    cluster_id: String,
+    cluster_label: String,
+    cluster_yaml: Option<String>,
+    resource_kind: Option<String>,
+    resource_name: Option<String>,
+    yaml: Option<String>,
+) -> Result<String, String> {
+    let mut popup_url =
+        Url::parse(&source_url).map_err(|error| format!("invalid source URL: {error}"))?;
+
+    let filtered_pairs: Vec<(String, String)> = popup_url
+        .query_pairs()
+        .into_owned()
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "tabPopout"
+                    | "tabKind"
+                    | "clusterId"
+                    | "tabId"
+                    | "subWindowPopout"
+                    | "subWindowKind"
+                    | "subWindowTabId"
+                    | "subWindowTitle"
+                    | "subWindowIcon"
+                    | "subWindowClusterId"
+                    | "subWindowClusterYaml"
+                    | "subWindowResourceKind"
+                    | "subWindowResourceName"
+                    | "subWindowYaml"
+            )
+        })
+        .collect();
+
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    for (key, value) in filtered_pairs {
+        query.append_pair(&key, &value);
+    }
+    query.append_pair("subWindowPopout", "1");
+    query.append_pair("subWindowKind", &sub_window_kind);
+    query.append_pair("subWindowTabId", &tab_id);
+    query.append_pair("subWindowTitle", &tab_title);
+    query.append_pair("subWindowIcon", &tab_icon);
+    query.append_pair("subWindowClusterId", &cluster_id);
+    if let Some(cluster_yaml_value) = cluster_yaml {
+        if !cluster_yaml_value.trim().is_empty() {
+            query.append_pair("subWindowClusterYaml", &cluster_yaml_value);
+        }
+    }
+    if let Some(resource_kind_value) = resource_kind {
+        if !resource_kind_value.trim().is_empty() {
+            query.append_pair("subWindowResourceKind", &resource_kind_value);
+        }
+    }
+    if let Some(resource_name_value) = resource_name {
+        if !resource_name_value.trim().is_empty() {
+            query.append_pair("subWindowResourceName", &resource_name_value);
+        }
+    }
+    if let Some(yaml_value) = yaml {
+        if !yaml_value.trim().is_empty() {
+            query.append_pair("subWindowYaml", &yaml_value);
+        }
+    }
+
+    let encoded_query = query.finish();
+    popup_url.set_query(Some(&encoded_query));
+
+    let safe_tab_id = sanitize_tab_id_for_window_label(&tab_id);
+    let epoch_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis();
+    let label = format!("xenage-subwindow-{safe_tab_id}-{epoch_ms}");
+    let title = if cluster_label.trim().is_empty() {
+        tab_title
+    } else {
+        format!("{tab_title} · {cluster_label}")
+    };
+
+    WebviewWindowBuilder::new(&app, label.clone(), WebviewUrl::External(popup_url))
+        .title(title)
+        .inner_size(1320.0, 820.0)
+        .min_inner_size(900.0, 620.0)
+        .center()
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    Ok(label)
+}
+
+#[tauri::command]
 async fn check_for_updates(
     app: AppHandle,
     channel: Option<String>,
@@ -1243,6 +1344,23 @@ async fn delete_cluster_connection(connection_id: String) -> Result<(), String> 
     cluster_connection::delete_cluster_connection(connection_id).await
 }
 
+#[tauri::command]
+async fn list_rbac_yaml_resources_from_yaml(
+    config_yaml: String,
+    kind: String,
+) -> Result<Vec<RbacYamlResourceEntry>, String> {
+    rbac_connection::list_rbac_yaml_resources_from_yaml(config_yaml, kind).await
+}
+
+#[tauri::command]
+async fn apply_rbac_yaml_resource_from_yaml(
+    config_yaml: String,
+    manifest_yaml: String,
+    delete_mode: bool,
+) -> Result<serde_json::Value, String> {
+    rbac_connection::apply_rbac_yaml_resource_from_yaml(config_yaml, manifest_yaml, delete_mode).await
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1250,6 +1368,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             open_detached_tab_window,
+            open_detached_horizontal_subwindow,
             check_for_updates,
             install_update,
             install_standalone_bundle,
@@ -1264,7 +1383,9 @@ fn main() {
             list_cluster_connection_yamls,
             list_cluster_ui_prefs,
             save_cluster_ui_prefs_entry,
-            delete_cluster_connection
+            delete_cluster_connection,
+            list_rbac_yaml_resources_from_yaml,
+            apply_rbac_yaml_resource_from_yaml
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

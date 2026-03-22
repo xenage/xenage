@@ -13,4 +13,4 @@ This directory is generated from the `structures` package.
 - [`structures.resources.events.sync`](structures_resources_events_sync.md) (13 structures)
 - [`structures.resources.membership`](structures_resources_membership.md) (28 structures)
 - [`structures.resources.observability`](structures_resources_observability.md) (3 structures)
-- [`structures.resources.rbac`](structures_resources_rbac.md) (9 structures)
+- [`structures.resources.rbac`](structures_resources_rbac.md) (14 structures)

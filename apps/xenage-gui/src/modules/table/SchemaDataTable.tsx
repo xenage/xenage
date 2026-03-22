@@ -73,9 +73,11 @@ export function SchemaDataTable({
   columns,
   emptyLabel = "No rows",
   filterQuery = "",
+  onSelectionChange,
   onReachEnd,
   onRowClick,
   rows,
+  selectionResetToken,
   selectable = true,
 }: {
   activeRowKey?: string | null;
@@ -84,9 +86,11 @@ export function SchemaDataTable({
   columns: IdeTableColumn[];
   emptyLabel?: string;
   filterQuery?: string;
+  onSelectionChange?: (rows: IdeTableRow[]) => void;
   onReachEnd?: () => void;
   onRowClick?: (row: IdeTableRow) => void;
   rows: IdeTableRow[];
+  selectionResetToken?: number;
   selectable?: boolean;
 }) {
   const tableScrollRef = useRef<OverlayScrollbarsComponentRef<"div"> | null>(null);
@@ -209,6 +213,14 @@ export function SchemaDataTable({
     });
   }, [columns]);
 
+  useEffect(() => {
+    if (selectionResetToken === undefined) {
+      return;
+    }
+    setSelectedRowKeys({});
+    selectionAnchorRowKeyRef.current = null;
+  }, [selectionResetToken]);
+
   const updateRowSelection = useCallback((rowKey: string, checked: boolean, shiftPressed: boolean) => {
     const anchorRowKey = selectionAnchorRowKeyRef.current;
     setSelectedRowKeys((current) => {
@@ -307,6 +319,14 @@ export function SchemaDataTable({
       detach?.();
     };
   }, [isNearBottom, onReachEnd, visibleRows.length]);
+
+  useEffect(() => {
+    if (!onSelectionChange) {
+      return;
+    }
+    const selected = rows.filter((row) => Boolean(selectedRowKeys[row.key]));
+    onSelectionChange(selected);
+  }, [onSelectionChange, rows, selectedRowKeys]);
 
   return (
     <OverlayScrollbarsComponent

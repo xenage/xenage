@@ -13,7 +13,7 @@ def test_gui_workflow_uploads_updater_artifacts():
 
     assert "verify updater artifacts (post-build)" in content
     assert "bundle/**/latest.json" in content
-    assert "continuing without updater manifest upload" in content
+    assert "No latest.json or *.sig updater artifacts were found." in content
     assert "bundle/**/*.sig" in content
     assert "bundle/**/*.tar.gz" in content
     assert "bundle/**/*.zip" in content
@@ -22,7 +22,7 @@ def test_gui_workflow_uploads_updater_artifacts():
 def test_gui_workflow_publishes_canonical_latest_json():
     content = _workflow_text()
 
-    assert "Merged " in content
-    assert "updater manifests into" in content
+    assert "Synthesized updater manifest into" in content
+    assert "Constructed updater manifest from" in content
     assert "/tmp/latest.json" in content
     assert "gh release upload \"${RELEASE_TAG}\" /tmp/latest.json --repo \"${REPO}\"" in content

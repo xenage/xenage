@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Icon, iconNameForItem } from "../../../components/Icon";
 import type { NavigationLeaf } from "../../../types/controlPlane";
 import type { ClusterEntry } from "../types";
+
+const RBAC_KINDS = new Set(["User", "Role", "RoleBinding"]);
 
 type ClusterTreeProps = {
   activeClusterId: string;
@@ -25,6 +28,10 @@ export function ClusterTree({
   onSelectCluster,
   onToggle,
 }: ClusterTreeProps) {
+  const mainItems = items.filter((item) => !RBAC_KINDS.has(item.kind));
+  const rbacItems = items.filter((item) => RBAC_KINDS.has(item.kind));
+  const [rbacExpanded, setRbacExpanded] = useState(true);
+
   return (
     <div className="cluster-node">
       <button
@@ -67,7 +74,7 @@ export function ClusterTree({
 
       {expanded ? (
         <div className="cluster-node__children">
-          {items.map((item) => (
+          {mainItems.map((item) => (
             <button
               className={`resource-link ${activeClusterId === cluster.id && activeKind === item.kind ? "resource-link--active" : ""}`}
               key={`${cluster.id}-${item.kind}`}
@@ -80,6 +87,34 @@ export function ClusterTree({
               <span>{item.label}</span>
             </button>
           ))}
+          {rbacItems.length > 0 ? (
+            <div className="cluster-node__subtree">
+              <button
+                aria-expanded={rbacExpanded}
+                className="resource-link resource-link--subtree-toggle"
+                onClick={() => setRbacExpanded((current) => !current)}
+                type="button"
+              >
+                <span className={`caret ${rbacExpanded ? "caret--open" : ""}`}>
+                  <Icon name="chevron" />
+                </span>
+                <span className="cluster-node__subtree-title">RBAC</span>
+              </button>
+              {rbacExpanded ? rbacItems.map((item) => (
+                <button
+                  className={`resource-link resource-link--subtree-item ${activeClusterId === cluster.id && activeKind === item.kind ? "resource-link--active" : ""}`}
+                  key={`${cluster.id}-${item.kind}`}
+                  onClick={() => onOpen(item.kind, cluster.id)}
+                  type="button"
+                >
+                  <span className="resource-link__glyph">
+                    <Icon name={iconNameForItem(item.kind)} />
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              )) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

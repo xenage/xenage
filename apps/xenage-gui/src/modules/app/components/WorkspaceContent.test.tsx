@@ -34,6 +34,12 @@ vi.mock("./SetupGuideView", () => ({
   ),
 }));
 
+vi.mock("../../rbac/RbacYamlEditor", () => ({
+  RbacYamlEditor: ({ activeKind }: { activeKind: string }) => (
+    <div data-testid="rbac-yaml-editor">rbac-yaml:{activeKind}</div>
+  ),
+}));
+
 const defaultTableSchema: ManifestTable = {
   kind: "Node",
   title: "Node",
@@ -117,6 +123,7 @@ function createProps(
     onRetrySnapshot: vi.fn(),
     onRuntimeArgsChange: vi.fn(),
     onSetControlPlaneArgs: vi.fn(),
+    onOpenRbacEditorTab: vi.fn(),
     onStartStandaloneServices: vi.fn(async () => {}),
     onStopStandaloneServices: vi.fn(async () => {}),
     onTableSearchChange: vi.fn(),
@@ -189,10 +196,10 @@ describe("WorkspaceContent", () => {
     expect(screen.getByTestId("group-config-table")).toBeInTheDocument();
   });
 
-  it("shows unavailable table when live snapshot kind is unsupported", () => {
+  it("renders RBAC yaml editor for user resource kind", () => {
     render(<WorkspaceContent {...createProps({ activeKind: "User" })} />);
 
-    expect(screen.getByText(/No schema fallback for User/)).toBeInTheDocument();
+    expect(screen.getByTestId("rbac-yaml-editor")).toHaveTextContent("rbac-yaml:User");
   });
 
   it("shows API loading state when snapshot data is still fetching", () => {

@@ -264,55 +264,124 @@ jobs:
           }
 
           const latestFiles = allFiles.filter((file) => path.basename(file) === 'latest.json');
-          if (latestFiles.length === 0) {
-            fs.writeFileSync(updaterListOutput, '');
-            fs.writeFileSync(skippedLatestOutput, '');
-            console.log('No latest.json files found in downloaded artifacts; skipping merged updater manifest upload.');
-            process.exit(0);
+          function inferGuiTargetFromAssetName(assetName) {
+            const lower = assetName.toLowerCase();
+            if (lower.endsWith('.msi.zip')) {
+              if (lower.includes('aarch64') || lower.includes('arm64')) {
+                return 'windows-aarch64';
+              }
+              return 'windows-x86_64';
+            }
+            if (lower.endsWith('.app.tar.gz')) {
+              if (lower.includes('aarch64') || lower.includes('arm64')) {
+                return 'darwin-aarch64';
+              }
+              return 'darwin-x86_64';
+            }
+            if (lower.endsWith('.appimage')) {
+              if (lower.includes('aarch64') || lower.includes('arm64')) {
+                return 'linux-aarch64';
+              }
+              return 'linux-x86_64';
+            }
+            return null;
           }
-
-          const firstManifest = JSON.parse(fs.readFileSync(latestFiles[0], 'utf8'));
-          const merged = {
-            version: firstManifest.version,
-            notes: firstManifest.notes,
-            pub_date: firstManifest.pub_date,
-            platforms: {},
-          };
 
           const updaterAssetPaths = new Set();
-          for (const manifestPath of latestFiles) {
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-            const platforms = manifest.platforms ?? {};
+          const merged = latestFiles.length > 0
+            ? (() => {
+                const firstManifest = JSON.parse(fs.readFileSync(latestFiles[0], 'utf8'));
+                const payload = {
+                  version: firstManifest.version,
+                  notes: firstManifest.notes,
+                  pub_date: firstManifest.pub_date,
+                  platforms: {},
+                };
 
-            for (const [target, payload] of Object.entries(platforms)) {
-              const rawUrl = payload && typeof payload.url === 'string' ? payload.url : '';
-              if (!rawUrl) {
-                throw new Error(`Missing updater URL for target ${target} in ${manifestPath}`);
-              }
+                for (const manifestPath of latestFiles) {
+                  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+                  const platforms = manifest.platforms ?? {};
 
-              let fileName;
-              try {
-                fileName = path.basename(new URL(rawUrl).pathname);
-              } catch (_) {
-                fileName = path.basename(rawUrl);
-              }
+                  for (const [target, targetPayload] of Object.entries(platforms)) {
+                    const rawUrl = targetPayload && typeof targetPayload.url === 'string' ? targetPayload.url : '';
+                    if (!rawUrl) {
+                      throw new Error(`Missing updater URL for target ${target} in ${manifestPath}`);
+                    }
 
-              const candidates = byBase.get(fileName) || [];
-              if (candidates.length === 0) {
-                throw new Error(`Updater payload ${fileName} referenced by ${manifestPath} was not found.`);
-              }
+                    let fileName;
+                    try {
+                      fileName = path.basename(new URL(rawUrl).pathname);
+                    } catch (_) {
+                      fileName = path.basename(rawUrl);
+                    }
 
-              const manifestDir = path.dirname(manifestPath);
-              const preferred = candidates.find((candidate) => candidate.startsWith(manifestDir))
-                || candidates[0];
-              updaterAssetPaths.add(preferred);
+                    const candidates = byBase.get(fileName) || [];
+                    if (candidates.length === 0) {
+                      throw new Error(`Updater payload ${fileName} referenced by ${manifestPath} was not found.`);
+                    }
 
-              merged.platforms[target] = {
-                ...payload,
-                url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
-              };
-            }
-          }
+                    const manifestDir = path.dirname(manifestPath);
+                    const preferred = candidates.find((candidate) => candidate.startsWith(manifestDir))
+                      || candidates[0];
+                    updaterAssetPaths.add(preferred);
+
+                    payload.platforms[target] = {
+                      ...targetPayload,
+                      url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
+                    };
+                  }
+                }
+
+                console.log(`Merged ${latestFiles.length} updater manifests into ${latestOutput}.`);
+                return payload;
+              })()
+            : (() => {
+                const signatureFiles = allFiles
+                  .filter((file) => file.endsWith('.sig'))
+                  .sort();
+
+                if (signatureFiles.length === 0) {
+                  throw new Error('No latest.json or *.sig updater artifacts were found.');
+                }
+
+                const payload = {
+                  version: process.env.RELEASE_VERSION,
+                  notes: '',
+                  pub_date: new Date().toISOString(),
+                  platforms: {},
+                };
+
+                for (const signaturePath of signatureFiles) {
+                  const assetPath = signaturePath.slice(0, -4);
+                  if (!fs.existsSync(assetPath)) {
+                    continue;
+                  }
+
+                  const fileName = path.basename(assetPath);
+                  const target = inferGuiTargetFromAssetName(fileName);
+                  if (!target) {
+                    continue;
+                  }
+
+                  const signature = fs.readFileSync(signaturePath, 'utf8').trim();
+                  if (!signature) {
+                    throw new Error(`Signature file is empty: ${signaturePath}`);
+                  }
+
+                  updaterAssetPaths.add(assetPath);
+                  payload.platforms[target] = {
+                    signature,
+                    url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
+                  };
+                }
+
+                if (Object.keys(payload.platforms).length === 0) {
+                  throw new Error('No updater platform/signature pairs could be inferred from *.sig files.');
+                }
+
+                console.log(`Constructed updater manifest from ${signatureFiles.length} signature files.`);
+                return payload;
+              })();
 
           if (Object.keys(merged.platforms).length === 0) {
             throw new Error('Merged updater manifest has no platform entries.');
@@ -321,7 +390,11 @@ jobs:
           fs.writeFileSync(latestOutput, `${JSON.stringify(merged, null, 2)}\n`);
           fs.writeFileSync(updaterListOutput, `${[...updaterAssetPaths].sort().join('\n')}\n`);
           fs.writeFileSync(skippedLatestOutput, `${latestFiles.sort().join('\n')}\n`);
-          console.log(`Merged ${latestFiles.length} updater manifests into ${latestOutput}.`);
+          if (latestFiles.length > 0) {
+            console.log(`Merged ${latestFiles.length} updater manifests into ${latestOutput}.`);
+          } else {
+            console.log(`Synthesized updater manifest into ${latestOutput}.`);
+          }
           NODE
 
           declare -A updater_assets

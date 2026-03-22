@@ -20,6 +20,18 @@
       {
         "label": "Events",
         "kind": "Event"
+      },
+      {
+        "label": "Users",
+        "kind": "User"
+      },
+      {
+        "label": "Roles",
+        "kind": "Role"
+      },
+      {
+        "label": "Role Bindings",
+        "kind": "RoleBinding"
       }
     ]
   },
@@ -522,6 +534,123 @@
         },
         "apiVersion": "xenage.io/v1alpha1"
       }
+    },
+    {
+      "kind": "User",
+      "title": "User",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "RbacObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ServiceAccountSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ServiceAccountStatus",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "engine",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "publicKey",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "enabled",
+            "type": "bool",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "apiVersion": "xenage.dev/v1",
+        "spec": {
+          "engine": "runtime/v1",
+          "publicKey": "",
+          "enabled": true
+        },
+        "status": {
+          "phase": "Active"
+        }
+      }
     }
   ],
   "tables": [
@@ -769,6 +898,153 @@
         "actor_type": "node",
         "action": "",
         "details": {}
+      }
+    },
+    {
+      "kind": "User",
+      "title": "Users",
+      "source": "rbac.users",
+      "rowKind": "UserTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "engine",
+          "label": "Engine",
+          "path": "engine",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "enabled",
+          "label": "Enabled",
+          "path": "enabled",
+          "type": "bool",
+          "isArray": false,
+          "width": 100,
+          "minWidth": 100,
+          "displayOnly": false
+        },
+        {
+          "key": "public_key",
+          "label": "Public Key",
+          "path": "public_key",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": true
+        }
+      ],
+      "sample": {
+        "name": "",
+        "engine": "",
+        "enabled": false,
+        "public_key": ""
+      }
+    },
+    {
+      "kind": "Role",
+      "title": "Roles",
+      "source": "rbac.roles",
+      "rowKind": "RoleTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "rule_count",
+          "label": "Rule Count",
+          "path": "rule_count",
+          "type": "int",
+          "isArray": false,
+          "width": 140,
+          "minWidth": 100,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "name": "",
+        "rule_count": 0
+      }
+    },
+    {
+      "kind": "RoleBinding",
+      "title": "Role Bindings",
+      "source": "rbac.role_bindings",
+      "rowKind": "RoleBindingTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "path": "role",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "subject_count",
+          "label": "Subject Count",
+          "path": "subject_count",
+          "type": "int",
+          "isArray": false,
+          "width": 140,
+          "minWidth": 100,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "name": "",
+        "role": "",
+        "subject_count": 0
       }
     }
   ]

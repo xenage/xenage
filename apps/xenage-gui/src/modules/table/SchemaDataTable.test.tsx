@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SchemaDataTable } from "./SchemaDataTable";
 
 const columns = [
@@ -46,5 +46,18 @@ describe("SchemaDataTable row selection", () => {
     expect(selectedRow1.checked).toBe(true);
     expect(selectedRow2.checked).toBe(false);
     expect(selectedRow3.checked).toBe(true);
+  });
+
+  it("reports selected rows via callback", () => {
+    const onSelectionChange = vi.fn();
+    render(<SchemaDataTable columns={columns} onSelectionChange={onSelectionChange} rows={rows} />);
+
+    const [row1] = getRowCheckboxes();
+    fireEvent.click(row1);
+
+    const latestCall = onSelectionChange.mock.calls[onSelectionChange.mock.calls.length - 1];
+    expect(latestCall?.[0]).toEqual([
+      expect.objectContaining({ key: "row-1" }),
+    ]);
   });
 });
