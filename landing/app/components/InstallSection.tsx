@@ -111,7 +111,7 @@ export default function InstallSection() {
         padding: "5rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           className="install-header"
           style={{
@@ -200,8 +200,9 @@ export default function InstallSection() {
           className="platforms-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: "0.75rem",
+            width: "100%",
             marginBottom: "2rem",
           }}
         >

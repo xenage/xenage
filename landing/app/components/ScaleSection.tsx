@@ -18,7 +18,7 @@ const scalePoints = [
     icon: Globe,
     title: "Multi-Cluster",
     description:
-      "Deploy across dTON, games, finance, and custom clusters. Copy configs between them.",
+      "Deploy across custom clusters. Copy & Paste configs between them.",
   },
   {
     icon: Server,
@@ -91,7 +91,7 @@ export default function ScaleSection() {
         padding: "4rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           className="scale-header"
           style={{
@@ -260,8 +260,9 @@ export default function ScaleSection() {
           className="scale-points"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "0.875rem",
+            width: "100%",
           }}
         >
           {scalePoints.map((point, i) => (

@@ -33,7 +33,7 @@ export default function CtaSection() {
         textAlign: "center",
       }}
     >
-      <div style={{ maxWidth: "560px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "560px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <h2
           className="cta-content"
           style={{

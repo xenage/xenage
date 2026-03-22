@@ -15,7 +15,7 @@ const problems = [
     icon: Layers,
     title: "Multi-cluster chaos",
     description:
-      "Different tasks require different clusters — dTON, games, finance, separate projects. Copying configurations between them should be trivial.",
+      "Different tasks require different clusters — personal, games, finance, separate projects. Copying configurations between them should be trivial.",
   },
   {
     icon: GitBranch,
@@ -73,7 +73,7 @@ export default function ProblemsSection() {
         padding: "4rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           style={{
             fontFamily: "JetBrains Mono, monospace",
@@ -106,10 +106,18 @@ export default function ProblemsSection() {
           className="problems-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: "1rem",
+            width: "100%",
           }}
         >
+          <style jsx>{`
+            @media (max-width: 1024px) {
+              .problems-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+              }
+            }
+          `}</style>
           {problems.map((problem, i) => (
             <div
               key={i}

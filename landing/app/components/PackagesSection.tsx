@@ -86,7 +86,7 @@ export default function PackagesSection() {
         padding: "4rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           className="pkg-header"
           style={{
@@ -132,8 +132,9 @@ export default function PackagesSection() {
           className="pkg-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             gap: "0.875rem",
+            width: "100%",
           }}
         >
           {packages.map((pkg, i) => (

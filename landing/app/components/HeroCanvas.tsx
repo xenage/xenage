@@ -321,15 +321,20 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
       }
 
       if (rootGroupRef.current) {
+        const isMobile = window.innerWidth <= 1024;
+        const currentBaseXOffset = isMobile ? 0 : baseXOffset;
+        const currentTopCenterYOffset = isMobile ? -0.32 : topCenterYOffset;
+        const currentScrollYOffset = isMobile ? 0 : scrollYOffset;
+
         rootGroupRef.current.rotation.x +=
           0.0016 + mouseRef.current.y * 0.0007 + dragRef.current.y * 0.0028;
         rootGroupRef.current.rotation.y +=
           0.0024 + mouseRef.current.x * 0.0007 + dragRef.current.x * 0.0028;
 
         rootGroupRef.current.position.x +=
-          (baseXOffset + mouseRef.current.x * 0.07 - rootGroupRef.current.position.x) * 0.028;
+          (currentBaseXOffset + mouseRef.current.x * 0.07 - rootGroupRef.current.position.x) * 0.028;
         const targetY =
-          topCenterYOffset - scrollProgressRef.current * scrollYOffset - mouseRef.current.y * 0.03;
+          currentTopCenterYOffset - scrollProgressRef.current * currentScrollYOffset - mouseRef.current.y * 0.03;
         rootGroupRef.current.position.y +=
           (targetY - rootGroupRef.current.position.y) * 0.028;
       }
@@ -420,6 +425,7 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
         }}
       />
       <div
+        className="pagination-dots"
         style={{
           position: "absolute",
           right: "1.2rem",
@@ -444,6 +450,13 @@ export default function HeroCanvas({ activeSection }: HeroCanvasProps) {
           />
         ))}
       </div>
+      <style jsx>{`
+        @media (max-width: 1024px) {
+          .pagination-dots {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

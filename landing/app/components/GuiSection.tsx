@@ -62,7 +62,7 @@ export default function GuiSection() {
         padding: "5rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           className="gui-header"
           style={{
@@ -128,6 +128,8 @@ export default function GuiSection() {
               className="gui-card"
               style={{
                 display: "flex",
+                flexDirection: "row",
+                flexWrap: "wrap",
                 gap: "1.5rem",
                 padding: "1.75rem",
                 background: "rgba(255, 255, 255, 0.94)",

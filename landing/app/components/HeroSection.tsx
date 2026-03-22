@@ -64,7 +64,14 @@ export default function HeroSection() {
         padding: "8rem 2rem 5rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
+        <style jsx>{`
+          @media (max-width: 1024px) {
+            section {
+              padding-top: 3.5rem !important;
+            }
+          }
+        `}</style>
         <div
           className="hero-badge"
           style={{

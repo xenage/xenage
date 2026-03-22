@@ -60,7 +60,7 @@ export default function FeaturesSection() {
         padding: "4rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px" }}>
+      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
         <p
           style={{
             fontFamily: "JetBrains Mono, monospace",
@@ -103,8 +103,9 @@ export default function FeaturesSection() {
           className="features-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "1rem",
+            width: "100%",
           }}
         >
           {features.map((feature, i) => (
