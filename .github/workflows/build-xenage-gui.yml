@@ -13,7 +13,7 @@ jobs:
       contents: write
       actions: write
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - platform: macos-13
@@ -159,7 +159,7 @@ jobs:
           key: xenage-gui-tauri-${{ runner.os }}-${{ matrix.arch }}-v2
 
   publish_release:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && always()
     needs: build
     runs-on: ubuntu-latest
     permissions:
