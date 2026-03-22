@@ -66,7 +66,15 @@ jobs:
         with:
           python-version: ${{ matrix.os == 'windows' && matrix.arch == 'aarch64' && '3.12' || '3.13' }}
 
-      - name: Install Python dependencies
+      - name: Install Python dependencies (Windows ARM64)
+        if: matrix.os == 'windows' && matrix.arch == 'aarch64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "cryptography>=46.0.0,<46.0.4"
+          pip install -e .
+
+      - name: Install Python dependencies (non-Windows ARM64)
+        if: matrix.os != 'windows' || matrix.arch != 'aarch64'
         run: pip install -e .
 
       - name: install dependencies (linux only)

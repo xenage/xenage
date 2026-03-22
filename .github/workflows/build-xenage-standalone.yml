@@ -58,7 +58,15 @@ jobs:
           uname -a
           uname -m
 
-      - name: install build dependencies
+      - name: install build dependencies (Windows ARM64)
+        if: matrix.os == 'windows' && matrix.arch == 'aarch64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "cryptography>=46.0.0,<46.0.4"
+          python -m pip install . pyinstaller pytest pytest-asyncio
+
+      - name: install build dependencies (non-Windows ARM64)
+        if: matrix.os != 'windows' || matrix.arch != 'aarch64'
         run: |
           python -m pip install --upgrade pip
           python -m pip install . pyinstaller pytest pytest-asyncio
