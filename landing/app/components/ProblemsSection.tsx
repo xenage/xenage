@@ -73,51 +73,50 @@ export default function ProblemsSection() {
         padding: "4rem 2rem",
       }}
     >
-      <div style={{ maxWidth: "760px", width: "100%", display: "flex", flexDirection: "column", alignItems: "inherit" }}>
-        <p
-          style={{
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "0.75rem",
-            color: "#0066ff",
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            marginBottom: "0.75rem",
-          }}
-        >
-          The Problem
-        </p>
+      <div
+        className="problems-container"
+        style={{ maxWidth: "1120px", width: "100%", display: "flex", flexDirection: "column" }}
+      >
+        <div className="problems-intro" style={{ maxWidth: "760px" }}>
+          <p
+            style={{
+              fontFamily: "JetBrains Mono, monospace",
+              fontSize: "0.75rem",
+              color: "#0066ff",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              marginBottom: "0.75rem",
+            }}
+          >
+            The Problem
+          </p>
 
-        <h2
-          style={{
-            fontFamily: "Space Grotesk, sans-serif",
-            fontSize: "clamp(1.5rem, 3.5vw, 2rem)",
-            fontWeight: 700,
-            lineHeight: 1.15,
-            letterSpacing: "-0.02em",
-            color: "#0d0d0d",
-            marginBottom: "2rem",
-          }}
-        >
-          Personal assistants are{" "}
-          <span style={{ color: "#0066ff" }}>not enough</span>
-        </h2>
+          <h2
+            style={{
+              fontFamily: "Space Grotesk, sans-serif",
+              fontSize: "clamp(1.5rem, 3.5vw, 2rem)",
+              fontWeight: 700,
+              lineHeight: 1.15,
+              letterSpacing: "-0.02em",
+              color: "#0d0d0d",
+              marginBottom: "2rem",
+            }}
+          >
+            Personal assistants are{" "}
+            <span style={{ color: "#0066ff" }}>not enough</span>
+          </h2>
+        </div>
 
         <div
           className="problems-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: "1rem",
             width: "100%",
+            alignItems: "stretch",
           }}
         >
-          <style jsx>{`
-            @media (max-width: 1024px) {
-              .problems-grid {
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
-              }
-            }
-          `}</style>
           {problems.map((problem, i) => (
             <div
               key={i}
@@ -127,6 +126,7 @@ export default function ProblemsSection() {
                 zIndex: 50,
                 display: "flex",
                 gap: "1rem",
+                height: "100%",
                 padding: "1.25rem",
                 background: "rgba(255, 255, 255, 0.8)",
                 border: "1px solid rgba(0, 0, 0, 0.06)",
@@ -177,6 +177,22 @@ export default function ProblemsSection() {
             </div>
           ))}
         </div>
+        <style jsx>{`
+          @media (max-width: 1200px) {
+            .problems-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+          }
+
+          @media (max-width: 760px) {
+            .problems-grid {
+              grid-template-columns: minmax(0, 1fr) !important;
+            }
+            .problems-intro {
+              max-width: 100% !important;
+            }
+          }
+        `}</style>
       </div>
     </section>
   );
