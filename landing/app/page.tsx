@@ -167,7 +167,7 @@ export default function Home() {
           position: relative;
           width: 80vw;
           min-width: 0;
-          background: transparent;
+          background: #f5f7fd !important;
         }
 
         .content-wrapper :global(section) {
@@ -229,6 +229,7 @@ export default function Home() {
 
           .content-wrapper {
             width: 82vw;
+            background: transparent !important;
           }
         }
 
@@ -239,7 +240,7 @@ export default function Home() {
 
           .content-wrapper {
             width: 100%;
-            background: rgba(250, 250, 250, 0.94);
+            background: transparent !important;
             border-right: none;
           }
 
