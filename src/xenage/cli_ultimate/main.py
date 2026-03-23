@@ -8,10 +8,12 @@ from xenage.network.cli_client import ControlPlaneClient
 
 from .commands import ApplyCommand, CanICommand, CliCommand, GetCommand
 from .context import CommandContext
+from .init_flow import XenageInitCommand
 
 
 class XenageCliApp:
     def __init__(self) -> None:
+        self.init_command = XenageInitCommand()
         self.commands: dict[str, CliCommand] = {
             "get": GetCommand(),
             "apply": ApplyCommand(),
@@ -49,16 +51,26 @@ class XenageCliApp:
         top_can_i_parser.add_argument("resource")
         top_can_i_parser.add_argument("--namespace", default="default")
 
+        init_parser = subparsers.add_parser("init")
+        init_parser.add_argument(
+            "--option",
+            choices=["gui", "control-plane-create", "control-plane-join", "runtime-join"],
+            help="Skip interactive menu and execute a specific init flow.",
+        )
+
         return parser
 
     def execute(self, argv: list[str]) -> int:
         parser = self.build_parser()
         args = parser.parse_args(argv)
+        command_key = str(args.command)
+        if command_key == "init":
+            return self.init_command.run(option=args.option)
+
         config_path = self._resolve_config_path(args.config)
         client = ControlPlaneClient.from_yaml(config_path)
         context = CommandContext(client=client)
 
-        command_key = str(args.command)
         if command_key == "auth":
             command_key = "auth-can-i"
 
