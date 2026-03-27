@@ -1,0 +1,324 @@
+name: Build Xenage Standalone
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+    tags: [ "*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: macos-15-intel
+            os: macos
+            arch: x86_64
+          - platform: macos-15
+            os: macos
+            arch: aarch64
+          - platform: ubuntu-22.04
+            os: linux
+            arch: x86_64
+          - platform: ubuntu-22.04-arm
+            os: linux
+            arch: aarch64
+          - platform: windows-latest
+            os: windows
+            arch: x86_64
+          - platform: windows-11-arm
+            os: windows
+            arch: aarch64
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.os == 'windows' && matrix.arch == 'aarch64' && '3.12' || '3.13' }}
+
+      - name: show runner architecture
+        shell: bash
+        run: |
+          echo "runner.os=${{ runner.os }}"
+          echo "matrix.arch=${{ matrix.arch }}"
+          uname -a
+          uname -m
+
+      - name: install build dependencies (Windows ARM64)
+        if: matrix.os == 'windows' && matrix.arch == 'aarch64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "cryptography>=46.0.0,<46.0.4"
+          python -m pip install . pyinstaller pytest pytest-asyncio
+
+      - name: install build dependencies (non-Windows ARM64)
+        if: matrix.os != 'windows' || matrix.arch != 'aarch64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pyinstaller pytest pytest-asyncio
+
+      - name: run python package tests (pre-standalone)
+        run: |
+          python -m pytest -q tests
+
+      - name: prepare release version
+        id: release_meta
+        run: node .github/scripts/prepare-xenage-standalone-version.mjs
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+      - name: build standalone artifacts
+        run: |
+          python scripts/build_standalone.py --version "${{ steps.release_meta.outputs.release_version }}"
+
+      - name: sign standalone artifacts
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          artifacts=(dist/standalone-release/*)
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "No standalone artifacts were produced to sign." >&2
+            exit 1
+          fi
+          for artifact in "${artifacts[@]}"; do
+            [ -f "${artifact}" ] || continue
+            npx --yes @tauri-apps/cli@2.10.1 signer sign "${artifact}"
+          done
+
+      - name: verify standalone binaries (post-build)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          binary_suffix=""
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            binary_suffix=".exe"
+          fi
+
+          xenage_bin="dist/standalone-build/pyinstaller-dist/xenage${binary_suffix}"
+
+          [ -f "${xenage_bin}" ]
+
+          "${xenage_bin}" --help >/dev/null
+          "${xenage_bin}" control-plane --help >/dev/null
+          "${xenage_bin}" runtime --help >/dev/null
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xenage-standalone-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: dist/standalone-release/*
+
+  publish_release:
+    if: github.event_name != 'pull_request' && needs.build.result == 'success'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: prepare release version
+        id: release_meta
+        run: node .github/scripts/prepare-xenage-standalone-version.mjs
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+      - name: verify tagged release points to main
+        if: steps.release_meta.outputs.release_mode == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"
+
+      - name: ensure release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_MODE: ${{ steps.release_meta.outputs.release_mode }}
+          RELEASE_PRERELEASE: ${{ steps.release_meta.outputs.release_prerelease }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_NAME: ${{ steps.release_meta.outputs.release_name }}
+        shell: bash
+        run: |
+          if [ "${RELEASE_MODE}" = "dev" ]; then
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release delete "${RELEASE_TAG}" --repo "${REPO}" --yes --cleanup-tag
+            fi
+            gh release create "${RELEASE_TAG}" \
+              --repo "${REPO}" \
+              --target "${GITHUB_SHA}" \
+              --title "${RELEASE_NAME}" \
+              --notes "Automated standalone development release from GitHub Actions" \
+              --prerelease
+          else
+            if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              echo "Release ${RELEASE_TAG} already exists."
+            else
+              create_args=(
+                "${RELEASE_TAG}"
+                --repo "${REPO}"
+                --target "${GITHUB_SHA}"
+                --title "${RELEASE_NAME}"
+                --notes "Automated standalone assets upload"
+              )
+              if [ "${RELEASE_PRERELEASE}" = "true" ]; then
+                create_args+=(--prerelease)
+              fi
+              gh release create "${create_args[@]}"
+            fi
+          fi
+
+      - name: download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: xenage-standalone-*
+          merge-multiple: true
+          path: dist/standalone-release
+
+      - name: upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
+        shell: bash
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("${file}")
+          done < <(find dist/standalone-release -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No files found in dist/standalone-release to upload" >&2
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const root = path.resolve('dist/standalone-release');
+          const repo = process.env.REPO;
+          const releaseTag = process.env.RELEASE_TAG;
+          const releaseVersion = process.env.RELEASE_VERSION;
+          const latestOutput = path.resolve('/tmp/latest.json');
+
+          const allFiles = fs.readdirSync(root)
+            .map((name) => path.join(root, name))
+            .filter((file) => fs.statSync(file).isFile());
+
+          const byBase = new Map();
+          for (const file of allFiles) {
+            byBase.set(path.basename(file), file);
+          }
+
+          function inferTargetFromAssetName(name) {
+            const lower = name.toLowerCase();
+            if (lower.startsWith('win_aarch_')) return 'windows-aarch64';
+            if (lower.startsWith('win_x86_')) return 'windows-x86_64';
+            if (lower.startsWith('mac_aarch_')) return 'darwin-aarch64';
+            if (lower.startsWith('mac_x86_')) return 'darwin-x86_64';
+            if (lower.startsWith('linux_aarch_')) return 'linux-aarch64';
+            if (lower.startsWith('linux_x86_')) return 'linux-x86_64';
+            return null;
+          }
+
+          const signatureFiles = allFiles
+            .filter((file) => file.endsWith('.sig'))
+            .sort();
+
+          if (signatureFiles.length === 0) {
+            throw new Error('No *.sig standalone artifacts found; latest.json cannot be generated.');
+          }
+
+          const latest = {
+            version: releaseVersion,
+            notes: '',
+            pub_date: new Date().toISOString(),
+            platforms: {},
+          };
+
+          for (const signaturePath of signatureFiles) {
+            const payloadName = path.basename(signaturePath).replace(/\.sig$/, '');
+            const payloadPath = byBase.get(payloadName);
+            if (!payloadPath) {
+              continue;
+            }
+
+            const target = inferTargetFromAssetName(payloadName);
+            if (!target) {
+              continue;
+            }
+
+            const signature = fs.readFileSync(signaturePath, 'utf8').trim();
+            if (!signature) {
+              throw new Error(`Signature file is empty: ${signaturePath}`);
+            }
+
+            latest.platforms[target] = {
+              signature,
+              url: `https://github.com/${repo}/releases/download/${releaseTag}/${payloadName}`,
+            };
+          }
+
+          if (Object.keys(latest.platforms).length === 0) {
+            throw new Error('No standalone platform/signature pairs were inferred for latest.json.');
+          }
+
+          fs.writeFileSync(latestOutput, `${JSON.stringify(latest, null, 2)}\n`);
+          console.log(`Generated standalone updater manifest: ${latestOutput}`);
+          NODE
+
+          printf 'Standalone release files to upload:\n'
+          for file in "${files[@]}"; do
+            printf ' - %s\n' "${file}"
+          done
+          gh release upload "${RELEASE_TAG}" "${files[@]}" --repo "${REPO}" --clobber
+          gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}" --clobber
+
+      - name: verify uploaded release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_count="$(gh release view "${RELEASE_TAG}" --repo "${REPO}" --json assets --jq '.assets | length')"
+          echo "Release ${RELEASE_TAG} asset count: ${asset_count}"
+          if [ "${asset_count}" -eq 0 ]; then
+            echo "Release assets were not uploaded." >&2
+            exit 1
+          fi

@@ -1,0 +1,362 @@
+/* Xenage - Neo-Geo Mathematical Design */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+    /* Core palette - mathematical precision */
+    --bg-primary: #fafafa;
+    --bg-secondary: #f5f5f5;
+    --bg-tertiary: #efefef;
+    --bg-dark: #0d0d0d;
+    --bg-card: rgba(255, 255, 255, 0.8);
+
+    /* Text */
+    --text-primary: #0d0d0d;
+    --text-secondary: #4a4a4a;
+    --text-muted: #8a8a8a;
+    --text-inverse: #fafafa;
+
+    /* Accent - electric blue for precision */
+    --accent-primary: #0066ff;
+    --accent-secondary: #00d4ff;
+    --accent-tertiary: #7b61ff;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(
+        135deg,
+        #0066ff 0%,
+        #00d4ff 50%,
+        #7b61ff 100%
+    );
+    --gradient-subtle: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
+
+    /* Grid */
+    --grid-color: rgba(0, 102, 255, 0.06);
+    --grid-size: 40px;
+
+    /* Spacing */
+    --space-unit: 8px;
+    --max-width: 1200px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family:
+        "Space Grotesk",
+        -apple-system,
+        sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mathematical Grid Background */
+.grid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: var(--grid-size) var(--grid-size);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.8;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.mono {
+    font-family: "JetBrains Mono", monospace;
+}
+
+/* Container */
+.container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 calc(var(--space-unit) * 4);
+}
+
+/* Section */
+section {
+    position: relative;
+    z-index: 1;
+}
+
+/* Gradient Text */
+.gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Buttons */
+.btn-primary {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 1rem 2rem;
+    background: var(--text-primary);
+    border: none;
+    color: var(--text-inverse);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--gradient-primary);
+    transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px rgba(0, 102, 255, 0.3);
+}
+
+.btn-primary:hover::before {
+    left: 0;
+}
+
+.btn-primary span {
+    position: relative;
+    z-index: 1;
+}
+
+.btn-secondary {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 1rem 2rem;
+    background: transparent;
+    border: 1.5px solid var(--text-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-secondary:hover {
+    background: var(--text-primary);
+    color: var(--text-inverse);
+    transform: translateY(-2px);
+}
+
+/* Cards */
+.card {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 2rem;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 102, 255, 0.2);
+}
+
+/* Geometric accent lines */
+.card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--gradient-primary);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card:hover::before {
+    transform: scaleX(1);
+}
+
+/* Section separator */
+.section-separator {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(0, 102, 255, 0.2),
+        transparent
+    );
+    margin: 0;
+}
+
+/* Floating geometric shapes */
+.geometric-float {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.06;
+}
+
+/* Cursor follower */
+.cursor-follower {
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--accent-primary);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s ease;
+    mix-blend-mode: difference;
+}
+
+/* Selection */
+::selection {
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    :root {
+        --grid-size: 24px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        padding: 0.875rem 1.5rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Canvas hidden on mobile - split layout */
+@media (max-width: 1024px) {
+    .canvas-bg,
+    [style*="position: fixed"][style*="right: 0"] {
+        display: none !important;
+    }
+}
+
+/* Animation keyframes */
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Reveal animations */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Stagger children */
+.stagger > * {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.stagger.active > *:nth-child(1) {
+    animation: fadeInUp 0.6s 0.1s forwards;
+}
+.stagger.active > *:nth-child(2) {
+    animation: fadeInUp 0.6s 0.15s forwards;
+}
+.stagger.active > *:nth-child(3) {
+    animation: fadeInUp 0.6s 0.2s forwards;
+}
+.stagger.active > *:nth-child(4) {
+    animation: fadeInUp 0.6s 0.25s forwards;
+}
+.stagger.active > *:nth-child(5) {
+    animation: fadeInUp 0.6s 0.3s forwards;
+}
+.stagger.active > *:nth-child(6) {
+    animation: fadeInUp 0.6s 0.35s forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -1,0 +1,15 @@
+apiVersion: xenage.io/v1alpha1
+kind: ClusterConnection
+metadata:
+  name: demo-admin
+spec:
+  clusterName: demo
+  controlPlaneUrls:
+    - http://127.0.0.1:8734
+    - http://127.0.0.1:18734
+    - http://127.0.0.1:28734
+  user:
+    id: admin
+    role: admin
+    publicKey: o+hqSLjmY/cM7kiI7Ds3b+VSWTlJ4yNQaClPHttWBec=
+    privateKey: SkZdiLUfAohaMwk6iYvl7qHnochhOpkok/1gH2fIqW0=

@@ -1,0 +1,6 @@
+NODE  ROLE           STATUS           ENDPOINT                   
+cp-1  control-plane  leader (leader)  http://control-plane-1:8734
+cp-2  control-plane  synced           http://control-plane-2:8736
+cp-3  control-plane  synced           http://control-plane-3:8737
+rt-1  runtime        ready            -                          
+rt-2  runtime        ready            -                          

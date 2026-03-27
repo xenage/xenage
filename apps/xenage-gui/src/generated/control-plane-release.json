@@ -1,0 +1,1051 @@
+{
+  "apiVersion": "xenage.io/v1alpha1",
+  "kind": "ControlPlaneRelease",
+  "generatedAt": "2026-03-14T12:30:00Z",
+  "product": {
+    "name": "Xenage",
+    "tagline": "AI Agent Control Plane"
+  },
+  "navigation": {
+    "label": "Cluster",
+    "children": [
+      {
+        "label": "Nodes",
+        "kind": "Node"
+      },
+      {
+        "label": "Group Config",
+        "kind": "GroupConfig"
+      },
+      {
+        "label": "Events",
+        "kind": "Event"
+      },
+      {
+        "label": "Users",
+        "kind": "User"
+      },
+      {
+        "label": "Roles",
+        "kind": "Role"
+      },
+      {
+        "label": "Role Bindings",
+        "kind": "RoleBinding"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "kind": "Node",
+      "title": "Node",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "NodeMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "NodeSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "NodeStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "nodeId",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "role",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "publicKey",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "endpoints",
+            "type": "str",
+            "required": false,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "leader",
+            "type": "bool",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastSeenAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "cp-1",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "nodeId": "cp-1",
+          "role": "control-plane",
+          "publicKey": "base64-public-key",
+          "endpoints": [
+            "http://127.0.0.1:8734"
+          ]
+        },
+        "status": {
+          "phase": "Connected",
+          "leader": true,
+          "lastSeenAt": "2026-03-14T12:24:00Z"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "GroupConfig",
+      "title": "GroupConfig",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "GroupConfigSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "GroupConfigStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "groupId",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "stateVersion",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "leaderEpoch",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "leaderNodeId",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "leaderPubkey",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "controlPlanes",
+            "type": "NodeRecord",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "runtimes",
+            "type": "NodeRecord",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "endpoints",
+            "type": "GroupEndpoint",
+            "required": true,
+            "isArray": true
+          },
+          {
+            "name": "expiresAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "nodeStatuses",
+            "type": "GroupNodeSyncStatus",
+            "required": false,
+            "isArray": true
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "controlPlaneCount",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "runtimeCount",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "main",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "groupId": "demo",
+          "stateVersion": 42,
+          "leaderEpoch": 3,
+          "leaderNodeId": "cp-1",
+          "leaderPubkey": "base64-public-key",
+          "controlPlanes": [
+            {
+              "node_id": "cp-1",
+              "role": "control-plane",
+              "public_key": "base64-public-key",
+              "endpoints": [
+                "http://127.0.0.1:8734"
+              ]
+            }
+          ],
+          "runtimes": [
+            {
+              "node_id": "rt-1",
+              "role": "runtime",
+              "public_key": "base64-runtime-key",
+              "endpoints": [
+                "http://127.0.0.1:8735"
+              ]
+            }
+          ],
+          "endpoints": [
+            {
+              "node_id": "cp-1",
+              "url": "http://127.0.0.1:8734"
+            },
+            {
+              "node_id": "rt-1",
+              "url": "http://127.0.0.1:8735"
+            }
+          ],
+          "expiresAt": "2026-03-14T12:30:00Z",
+          "nodeStatuses": []
+        },
+        "status": {
+          "phase": "Active",
+          "controlPlaneCount": 1,
+          "runtimeCount": 1
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "Event",
+      "title": "Event",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "ObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "EventSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "EventStatus",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "namespace",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "regarding",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "type",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "reason",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "message",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "literal",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "lastSeenAt",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "event-1d2f",
+          "namespace": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "spec": {
+          "regarding": "Node/cp-1",
+          "type": "Normal",
+          "reason": "Joined",
+          "message": "Node cp-1 joined the group"
+        },
+        "status": {
+          "phase": "Observed",
+          "count": 1,
+          "lastSeenAt": "2026-03-14T12:24:00Z"
+        },
+        "apiVersion": "xenage.io/v1alpha1"
+      }
+    },
+    {
+      "kind": "User",
+      "title": "User",
+      "fields": [
+        {
+          "name": "metadata",
+          "type": "RbacObjectMeta",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "apiVersion",
+          "type": "str",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "spec",
+          "type": "ServiceAccountSpec",
+          "required": false,
+          "isArray": false
+        },
+        {
+          "name": "status",
+          "type": "ServiceAccountStatus",
+          "required": false,
+          "isArray": false
+        }
+      ],
+      "sections": {
+        "metadata": [
+          {
+            "name": "name",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "labels",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "annotations",
+            "type": "map",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "uid",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "generation",
+            "type": "int",
+            "required": false,
+            "isArray": false
+          },
+          {
+            "name": "createdAt",
+            "type": "str?",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "spec": [
+          {
+            "name": "engine",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "publicKey",
+            "type": "str",
+            "required": true,
+            "isArray": false
+          },
+          {
+            "name": "enabled",
+            "type": "bool",
+            "required": false,
+            "isArray": false
+          }
+        ],
+        "status": [
+          {
+            "name": "phase",
+            "type": "str",
+            "required": false,
+            "isArray": false
+          }
+        ]
+      },
+      "sample": {
+        "metadata": {
+          "name": "default",
+          "labels": {},
+          "annotations": {},
+          "uid": null,
+          "generation": 1,
+          "createdAt": null
+        },
+        "apiVersion": "xenage.dev/v1",
+        "spec": {
+          "engine": "runtime/v1",
+          "publicKey": "",
+          "enabled": true
+        },
+        "status": {
+          "phase": "Active"
+        }
+      }
+    }
+  ],
+  "tables": [
+    {
+      "kind": "Node",
+      "title": "Nodes",
+      "source": "snapshot.nodes",
+      "rowKind": "ClusterNodeTableRow",
+      "rowKey": "node_id",
+      "defaultSort": {
+        "field": "node_id",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "node_id",
+          "label": "Node Id",
+          "path": "node_id",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "path": "role",
+          "type": "literal",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "leader",
+          "label": "Leader",
+          "path": "leader",
+          "type": "bool",
+          "isArray": false,
+          "width": 100,
+          "minWidth": 100,
+          "displayOnly": false
+        },
+        {
+          "key": "public_key",
+          "label": "Public Key",
+          "path": "public_key",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": true
+        },
+        {
+          "key": "endpoints",
+          "label": "Endpoints",
+          "path": "endpoints",
+          "type": "str",
+          "isArray": true,
+          "width": 440,
+          "minWidth": 220,
+          "displayOnly": false
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "path": "status",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "version",
+          "label": "Version",
+          "path": "version",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "age",
+          "label": "Age",
+          "path": "age",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "last_poll_at",
+          "label": "Last Poll At",
+          "path": "last_poll_at",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "node_id": "",
+        "role": "control-plane",
+        "leader": false,
+        "public_key": "",
+        "endpoints": [],
+        "status": "",
+        "name": "",
+        "version": "",
+        "age": "",
+        "last_poll_at": ""
+      }
+    },
+    {
+      "kind": "GroupConfig",
+      "title": "Group Config",
+      "source": "snapshot.group_config",
+      "rowKind": "GroupConfigKeyTableRow",
+      "rowKey": "key",
+      "defaultSort": {
+        "field": "key",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "key",
+          "label": "Key",
+          "path": "key",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "value",
+          "label": "Value",
+          "path": "value",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "key": "",
+        "value": ""
+      }
+    },
+    {
+      "kind": "Event",
+      "title": "Events",
+      "source": "events.items",
+      "rowKind": "EventLogEntry",
+      "rowKey": "sequence",
+      "defaultSort": {
+        "field": "sequence",
+        "direction": "desc"
+      },
+      "pageSize": 200,
+      "columns": [
+        {
+          "key": "sequence",
+          "label": "Sequence",
+          "path": "sequence",
+          "type": "int",
+          "isArray": false,
+          "width": 90,
+          "minWidth": 100,
+          "displayOnly": false
+        },
+        {
+          "key": "happened_at",
+          "label": "Happened At",
+          "path": "happened_at",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "actor_id",
+          "label": "Actor Id",
+          "path": "actor_id",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "actor_type",
+          "label": "Actor Type",
+          "path": "actor_type",
+          "type": "literal",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "action",
+          "label": "Action",
+          "path": "action",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "details",
+          "label": "Details",
+          "path": "details",
+          "type": "map",
+          "isArray": false,
+          "width": 440,
+          "minWidth": 220,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "sequence": 0,
+        "happened_at": "",
+        "actor_id": "",
+        "actor_type": "node",
+        "action": "",
+        "details": {}
+      }
+    },
+    {
+      "kind": "User",
+      "title": "Users",
+      "source": "rbac.users",
+      "rowKind": "UserTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "engine",
+          "label": "Engine",
+          "path": "engine",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "enabled",
+          "label": "Enabled",
+          "path": "enabled",
+          "type": "bool",
+          "isArray": false,
+          "width": 100,
+          "minWidth": 100,
+          "displayOnly": false
+        },
+        {
+          "key": "public_key",
+          "label": "Public Key",
+          "path": "public_key",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": true
+        }
+      ],
+      "sample": {
+        "name": "",
+        "engine": "",
+        "enabled": false,
+        "public_key": ""
+      }
+    },
+    {
+      "kind": "Role",
+      "title": "Roles",
+      "source": "rbac.roles",
+      "rowKind": "RoleTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "rule_count",
+          "label": "Rule Count",
+          "path": "rule_count",
+          "type": "int",
+          "isArray": false,
+          "width": 140,
+          "minWidth": 100,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "name": "",
+        "rule_count": 0
+      }
+    },
+    {
+      "kind": "RoleBinding",
+      "title": "Role Bindings",
+      "source": "rbac.role_bindings",
+      "rowKind": "RoleBindingTableRow",
+      "rowKey": "name",
+      "defaultSort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "pageSize": null,
+      "columns": [
+        {
+          "key": "name",
+          "label": "Name",
+          "path": "name",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "path": "role",
+          "type": "str",
+          "isArray": false,
+          "width": 220,
+          "minWidth": 140,
+          "displayOnly": false
+        },
+        {
+          "key": "subject_count",
+          "label": "Subject Count",
+          "path": "subject_count",
+          "type": "int",
+          "isArray": false,
+          "width": 140,
+          "minWidth": 100,
+          "displayOnly": false
+        }
+      ],
+      "sample": {
+        "name": "",
+        "role": "",
+        "subject_count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+[project]
+name = "xenage-structures"
+version = "0.1.0"
+description = "Shared control plane structures for Xenage runtime and GUI."
+requires-python = ">=3.12"
+dependencies = [
+  "msgspec>=0.19.0",
+  "PyYAML>=6.0.2",
+  "cryptography>=46.0.0,<46.0.4",
+  "loguru>=0.7.3",
+  "dynaconf>=3.2.11",
+  "aiohttp>=3.11.0",
+]
+
+[project.scripts]
+xenage-control-plane = "xenage.cli:control_plane_main"
+xenage-runtime = "xenage.cli:runtime_main"
+xenage = "xenage.cli:xenage_cli_main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = ".", "xenage" = "src/xenage"}
+packages = [
+  "structures",
+  "xenage",
+  "xenage.cli_ultimate",
+  "xenage.app",
+  "xenage.cluster",
+  "xenage.network",
+  "xenage.nodes",
+  "xenage.nodes.control_plane",
+  "xenage.nodes.control_plane.control_plane_api",
+  "xenage.nodes.runtime",
+  "xenage.persistence",
+]

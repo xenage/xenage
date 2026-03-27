@@ -1,0 +1,112 @@
+services:
+  control-plane-1:
+    image: xenage:local
+    container_name: xenage-control-plane-1
+    command:
+      - sh
+      - -lc
+      - >
+        if [ ! -f /data/cp-1/xenage.db ]; then
+          python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-1 --data-dir /data/cp-1 --endpoint http://control-plane-1:8734 init --group-id demo;
+        fi;
+        until [ -f /data/cp-1/xenage.db ]; do sleep 1; done;
+        python -c "import json, sqlite3; db=sqlite3.connect('/data/cp-1/xenage.db'); row=db.execute(\"SELECT value FROM kv_store WHERE key='group_state'\").fetchone(); db.close(); print(json.loads(row[0])['leader_pubkey'])" > /shared/leader.pubkey;
+        python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-1 --data-dir /data/cp-1 --endpoint http://control-plane-1:8734 serve --bootstrap-out /shared/cp-2.token --bootstrap-out /shared/cp-3.token --bootstrap-out /shared/rt-1.token --bootstrap-out /shared/rt-2.token &
+        server_pid=$$!;
+        until python -c "import json, sqlite3, sys; db=sqlite3.connect('/data/cp-1/xenage.db'); row=db.execute(\"SELECT value FROM kv_store WHERE key='group_state'\").fetchone(); db.close(); state=json.loads(row[0]) if row else {}; sys.exit(0 if len(state.get('control_planes', [])) >= 3 else 1)"; do sleep 1; done;
+        python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-1 --data-dir /data/cp-1 --endpoint http://control-plane-1:8734 gui-bootstrap-token --out /shared/gui-admin.token;
+        gui_bootstrap_token=$$(tr -d '\r\n' < /shared/gui-admin.token);
+        python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-1 --data-dir /data/cp-1 --endpoint http://control-plane-1:8734 gui-bootstrap-user --leader-url http://127.0.0.1:8734 --bootstrap-token "$$gui_bootstrap_token" --control-plane-url http://127.0.0.1:8734 --control-plane-url http://127.0.0.1:18734 --control-plane-url http://127.0.0.1:28734 --user-id admin --out /shared/gui-admin.yaml;
+        echo '=== XENAGE GUI CONFIG (/shared/gui-admin.yaml) ===';
+        cat /shared/gui-admin.yaml;
+        echo '=== END XENAGE GUI CONFIG ===';
+        wait $$server_pid
+    volumes:
+      - cp1-data:/data/cp-1
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:8734:8734"
+
+  control-plane-2:
+    image: xenage:local
+    container_name: xenage-control-plane-2
+    depends_on:
+      - control-plane-1
+    command:
+      - sh
+      - -lc
+      - >
+        if [ ! -f /data/cp-2/xenage.db ]; then
+          until [ -s /shared/leader.pubkey ] && [ -s /shared/cp-2.token ]; do sleep 1; done;
+          until leader_pubkey=$(tr -d '\r\n' < /shared/leader.pubkey) && bootstrap_token=$(tr -d '\r\n' < /shared/cp-2.token) && [ -n "$$leader_pubkey" ] && [ -n "$$bootstrap_token" ] && python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-2 --data-dir /data/cp-2 --endpoint http://control-plane-2:8736 connect --leader-host http://control-plane-1:8734 --leader-pubkey "$$leader_pubkey" --bootstrap-token "$$bootstrap_token"; do sleep 1; done;
+        fi;
+        python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-2 --data-dir /data/cp-2 --endpoint http://control-plane-2:8736 serve --host 0.0.0.0 --port 8736
+    volumes:
+      - cp2-data:/data/cp-2
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:18734:8736"
+
+  control-plane-3:
+    image: xenage:local
+    container_name: xenage-control-plane-3
+    depends_on:
+      - control-plane-1
+    command:
+      - sh
+      - -lc
+      - >
+        if [ ! -f /data/cp-3/xenage.db ]; then
+          until [ -s /shared/leader.pubkey ] && [ -s /shared/cp-3.token ]; do sleep 1; done;
+          until leader_pubkey=$(tr -d '\r\n' < /shared/leader.pubkey) && bootstrap_token=$(tr -d '\r\n' < /shared/cp-3.token) && [ -n "$$leader_pubkey" ] && [ -n "$$bootstrap_token" ] && python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-3 --data-dir /data/cp-3 --endpoint http://control-plane-3:8737 connect --leader-host http://control-plane-1:8734 --leader-pubkey "$$leader_pubkey" --bootstrap-token "$$bootstrap_token"; do sleep 1; done;
+        fi;
+        python -c "from xenage.cli import control_plane_main; control_plane_main()" --node-id cp-3 --data-dir /data/cp-3 --endpoint http://control-plane-3:8737 serve --host 0.0.0.0 --port 8737
+    volumes:
+      - cp3-data:/data/cp-3
+      - shared-artifacts:/shared
+    ports:
+      - "127.0.0.1:28734:8737"
+
+  runtime-1:
+    image: xenage:local
+    container_name: xenage-runtime-1
+    depends_on:
+      - control-plane-1
+    command:
+      - sh
+      - -lc
+      - >
+        if [ ! -f /data/rt-1/xenage.db ]; then
+          until [ -s /shared/leader.pubkey ] && [ -s /shared/rt-1.token ]; do sleep 1; done;
+          until leader_pubkey=$(tr -d '\r\n' < /shared/leader.pubkey) && bootstrap_token=$(tr -d '\r\n' < /shared/rt-1.token) && [ -n "$$leader_pubkey" ] && [ -n "$$bootstrap_token" ] && python -c "from xenage.cli import runtime_main; runtime_main()" --node-id rt-1 --data-dir /data/rt-1 connect --leader-host http://control-plane-1:8734 --leader-pubkey "$$leader_pubkey" --bootstrap-token "$$bootstrap_token"; do sleep 1; done;
+        fi;
+        python -c "from xenage.cli import runtime_main; runtime_main()" --node-id rt-1 --data-dir /data/rt-1 serve
+    volumes:
+      - rt1-data:/data/rt-1
+      - shared-artifacts:/shared
+    # ports:
+
+  runtime-2:
+    image: xenage:local
+    container_name: xenage-runtime-2
+    depends_on:
+      - control-plane-1
+    command:
+      - sh
+      - -lc
+      - >
+        if [ ! -f /data/rt-2/xenage.db ]; then
+          until [ -s /shared/leader.pubkey ] && [ -s /shared/rt-2.token ]; do sleep 1; done;
+          until leader_pubkey=$(tr -d '\r\n' < /shared/leader.pubkey) && bootstrap_token=$(tr -d '\r\n' < /shared/rt-2.token) && [ -n "$$leader_pubkey" ] && [ -n "$$bootstrap_token" ] && python -c "from xenage.cli import runtime_main; runtime_main()" --node-id rt-2 --data-dir /data/rt-2 connect --leader-host http://control-plane-1:8734 --leader-pubkey "$$leader_pubkey" --bootstrap-token "$$bootstrap_token"; do sleep 1; done;
+        fi;
+        python -c "from xenage.cli import runtime_main; runtime_main()" --node-id rt-2 --data-dir /data/rt-2 serve
+    volumes:
+      - rt2-data:/data/rt-2
+      - shared-artifacts:/shared
+volumes:
+  cp1-data:
+  cp2-data:
+  cp3-data:
+  rt1-data:
+  rt2-data:
+  shared-artifacts:
