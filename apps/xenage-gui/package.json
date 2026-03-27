@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "generate:structures": "cd ../.. && python scripts/export_structures.py",
+    "generate:structures": "cd ../.. && .venv/bin/python scripts/export_structures.py",
     "dev": "npm run generate:structures && vite",
     "build": "npm run generate:structures && tsc -b && vite build",
     "lint": "eslint .",

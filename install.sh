@@ -3,6 +3,7 @@
 OS=$(uname -s)
 ARCH=$(uname -m)
 TARGET=
+CHANNEL="${XENAGE_CHANNEL:-}"
 
 if [ "${OS}" = "Linux" ]
 then
@@ -39,8 +40,35 @@ then
     exit 1
 fi
 
+if [ -z "${CHANNEL}" ]
+then
+    if [ -r /dev/tty ]
+    then
+        echo
+        echo "Choose release channel:"
+        echo "  1) Latest"
+        echo "  2) Development"
+        echo -n "Select [1/2] (default 2): "
+        read answer < /dev/tty || true
+        if [ "${answer}" = "1" ] || [ "${answer}" = "latest" ] || [ "${answer}" = "Latest" ]
+        then
+            CHANNEL="latest"
+        else
+            CHANNEL="development"
+        fi
+    else
+        CHANNEL="development"
+    fi
+fi
+
+if [ "${CHANNEL}" != "latest" ] && [ "${CHANNEL}" != "development" ]
+then
+    echo "Unsupported channel '${CHANNEL}'. Use latest or development."
+    exit 1
+fi
+
 BASE_URL="${XENAGE_INSTALL_BASE_URL:-https://xenage.dev}"
-URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}"
+URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}&channel=${CHANNEL}"
 
 xenage_download_filename_prefix="xenage"
 xenage="$xenage_download_filename_prefix"
@@ -73,8 +101,19 @@ fi
 echo
 echo "Will download ${URL} into ${xenage}"
 echo
-curl -fL "${URL}" -o "${xenage}" && chmod a+x "${xenage}" || exit 1
+tmp_download="${xenage}.download.tmp"
+http_code=$(curl -sSL -w "%{http_code}" -o "${tmp_download}" "${URL}")
+if [ "${http_code}" != "200" ]
+then
+    echo "Backend download failed with HTTP ${http_code}"
+    cat "${tmp_download}"
+    rm -f "${tmp_download}"
+    exit 1
+fi
+
+mv "${tmp_download}" "${xenage}"
+chmod a+x "${xenage}" || exit 1
 
 echo
-echo "Successfully downloaded Xenage binary, you can run it as:"
+echo "Successfully downloaded Xenage binary (${CHANNEL}), you can run it as:"
 echo "    ./${xenage} init"

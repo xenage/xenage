@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 WORKFLOW_PATH = Path(".github/workflows/build-xenage-standalone.yml")
+PREPARE_SCRIPT_PATH = Path(".github/scripts/prepare-xenage-standalone-version.mjs")
 
 
 def _workflow_text() -> str:
@@ -22,3 +23,12 @@ def test_standalone_workflow_generates_latest_manifest():
     assert "Generated standalone updater manifest" in content
     assert "/tmp/latest.json" in content
     assert "gh release upload \"${RELEASE_TAG}\" /tmp/latest.json --repo \"${REPO}\"" in content
+
+
+def test_standalone_workflow_supports_unified_nightly_and_tag_releases():
+    content = _workflow_text()
+    prepare_script = PREPARE_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert 'tags: [ "*" ]' in content
+    assert "verify tagged release points to main" in content
+    assert "releaseTag = 'nightly'" in prepare_script

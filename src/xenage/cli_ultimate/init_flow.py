@@ -17,8 +17,10 @@ class InitOption:
 
 
 class XenageInitCommand:
-    GUI_MANIFEST_URL: Final[str] = "https://github.com/xenage/xenage/releases/download/xenage-gui-dev/latest.json"
-    GUI_RELEASE_API_URL: Final[str] = "https://api.github.com/repos/xenage/xenage/releases/tags/xenage-gui-dev"
+    GUI_MANIFEST_URL: Final[str] = "https://github.com/xenage/xenage/releases/latest/download/latest.json"
+    GUI_NIGHTLY_MANIFEST_URL: Final[str] = "https://github.com/xenage/xenage/releases/download/nightly/latest.json"
+    GUI_RELEASE_API_URL: Final[str] = "https://api.github.com/repos/xenage/xenage/releases/latest"
+    GUI_NIGHTLY_RELEASE_API_URL: Final[str] = "https://api.github.com/repos/xenage/xenage/releases/tags/nightly"
 
     def __init__(self, env: InitEnvironment | None = None) -> None:
         self.env = env or InitEnvironment()
@@ -26,7 +28,7 @@ class XenageInitCommand:
             InitOption(
                 key="gui",
                 title="Установить GUI",
-                description="Определить текущую ОС и установить GUI из dev release",
+                description="Определить текущую ОС и установить GUI из latest release",
             ),
             InitOption(
                 key="control-plane-create",
@@ -48,7 +50,7 @@ class XenageInitCommand:
     def run(self, option: str | None = None) -> int:
         selected = option or self._select_option_interactive()
         if selected == "gui":
-            self._install_gui_dev_release()
+            self._install_gui_release()
             return 0
         if selected == "control-plane-create":
             self._setup_control_plane_and_create_cluster()
@@ -300,9 +302,9 @@ class XenageInitCommand:
         print(f"- PID: {pid_path}")
         print(f"- Log: {log_path}")
 
-    def _install_gui_dev_release(self) -> None:
+    def _install_gui_release(self) -> None:
         target = self.env.release_target()
-        print(f"\nУстанавливаю Xenage GUI (dev) для {target}...")
+        print(f"\nУстанавливаю Xenage GUI (latest release) для {target}...")
         url = self._resolve_gui_asset_url(target)
         download_dir = Path.home() / ".xenage" / "gui" / "downloads"
         download_dir.mkdir(parents=True, exist_ok=True)
@@ -326,10 +328,19 @@ class XenageInitCommand:
         print(f"- Результат: {installed}")
 
     def _resolve_gui_asset_url(self, target: str) -> str:
-        payload = self.env.fetch_json(self.GUI_MANIFEST_URL)
+        try:
+            return self._resolve_gui_asset_url_with_manifest(target, self.GUI_MANIFEST_URL)
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            print("Latest release manifest not found, falling back to nightly release manifest.")
+            return self._resolve_gui_asset_url_with_manifest(target, self.GUI_NIGHTLY_MANIFEST_URL)
+
+    def _resolve_gui_asset_url_with_manifest(self, target: str, manifest_url: str) -> str:
+        payload = self.env.fetch_json(manifest_url)
         platforms = payload.get("platforms")
         if not isinstance(platforms, dict):
-            raise RuntimeError(f"invalid release manifest at {self.GUI_MANIFEST_URL}: missing platforms")
+            raise RuntimeError(f"invalid release manifest at {manifest_url}: missing platforms")
 
         candidates = [target]
         if target == "darwin-aarch64":
@@ -350,7 +361,13 @@ class XenageInitCommand:
         raise RuntimeError(f"release manifest does not contain target: {target}")
 
     def _resolve_gui_asset_url_from_release_assets(self, target: str) -> str:
-        payload = self.env.fetch_json(self.GUI_RELEASE_API_URL)
+        try:
+            payload = self.env.fetch_json(self.GUI_RELEASE_API_URL)
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            print("Latest release API endpoint not found, falling back to nightly release API endpoint.")
+            payload = self.env.fetch_json(self.GUI_NIGHTLY_RELEASE_API_URL)
         assets = payload.get("assets")
         if not isinstance(assets, list):
             raise RuntimeError("release API payload does not include assets")

@@ -26,3 +26,12 @@ def test_gui_workflow_publishes_canonical_latest_json():
     assert "Constructed updater manifest from" in content
     assert "/tmp/latest.json" in content
     assert "gh release upload \"${RELEASE_TAG}\" /tmp/latest.json --repo \"${REPO}\"" in content
+
+
+def test_gui_workflow_supports_unified_nightly_and_tag_releases():
+    content = _workflow_text()
+
+    assert "tags: [\"*\"]" in content
+    assert "releaseTag = 'nightly'" in Path(".github/scripts/prepare-xenage-gui-version.mjs").read_text(encoding="utf-8")
+    assert "node .github/scripts/generate-xenage-release-notes.mjs" in content
+    assert "verify tagged release points to main" in content

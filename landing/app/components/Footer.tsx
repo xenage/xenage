@@ -98,78 +98,6 @@ export default function Footer() {
                   marginBottom: "1rem",
                 }}
               >
-                Product
-              </h4>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
-                <a
-                  href="#features"
-                  style={{
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#4a4a4a",
-                    textDecoration: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  Features
-                </a>
-                <a
-                  href="#install"
-                  style={{
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#4a4a4a",
-                    textDecoration: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  Install
-                </a>
-                <a
-                  href="#scale"
-                  style={{
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#4a4a4a",
-                    textDecoration: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  Scale
-                </a>
-                <a
-                  href="#gui"
-                  style={{
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#4a4a4a",
-                    textDecoration: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  GUI
-                </a>
-              </div>
-            </div>
-
-            <div>
-              <h4
-                style={{
-                  fontFamily: "Space Grotesk, sans-serif",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  color: "#0d0d0d",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "1rem",
-                }}
-              >
                 Resources
               </h4>
               <div
@@ -207,32 +135,8 @@ export default function Footer() {
                 >
                   GitHub
                 </a>
-              </div>
-            </div>
-
-            <div>
-              <h4
-                style={{
-                  fontFamily: "Space Grotesk, sans-serif",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  color: "#0d0d0d",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "1rem",
-                }}
-              >
-                Company
-              </h4>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
                 <a
-                  href="https://docs.xenage.dev"
+                  href="https://x.com/xenage_dev"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -243,21 +147,7 @@ export default function Footer() {
                     transition: "color 0.2s ease",
                   }}
                 >
-                  About
-                </a>
-                <a
-                  href="https://github.com/xenage/xenage/releases"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#4a4a4a",
-                    textDecoration: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  Blog
+                  X.com
                 </a>
               </div>
             </div>

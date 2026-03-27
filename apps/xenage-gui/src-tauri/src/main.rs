@@ -23,7 +23,7 @@ const STABLE_UPDATE_ENDPOINT: &str =
 const DEV_UPDATE_ENDPOINT: &str =
     "https://github.com/xenage/xenage/releases/download/xenage-gui-dev/latest.json";
 const STANDALONE_STABLE_BASE: &str =
-    "https://github.com/xenage/xenage/releases/download/xenage-standalone-main";
+    "https://github.com/xenage/xenage/releases/latest/download";
 const STANDALONE_DEV_BASE: &str =
     "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev";
 

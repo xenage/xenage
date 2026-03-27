@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Terminal, Download, Monitor, Smartphone, Globe } from "lucide-react";
+import {
+  Terminal,
+  Download,
+  Monitor,
+  Smartphone,
+  Globe,
+  Copy,
+  CheckCircle2,
+} from "lucide-react";
 
 const platforms = [
   {
@@ -48,6 +56,13 @@ export default function InstallSection() {
   const [recommendedPlatform, setRecommendedPlatform] = useState<string | null>(
     null,
   );
+  const [copied, setCopied] = useState(false);
+
+  const copyInstall = async () => {
+    await navigator.clipboard.writeText("curl https://xenage.dev | sh");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -189,10 +204,32 @@ export default function InstallSection() {
                 fontSize: "1rem",
                 color: "#0d0d0d",
                 flex: 1,
+                minWidth: 0,
               }}
             >
               curl https://xenage.dev | sh
             </code>
+            <button
+              type="button"
+              onClick={copyInstall}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "34px",
+                height: "34px",
+                borderRadius: "8px",
+                border: "1px solid rgba(0, 212, 255, 0.35)",
+                background: "rgba(0, 102, 255, 0.08)",
+                color: copied ? "#0066ff" : "rgba(13, 13, 13, 0.68)",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+              aria-label="Copy install command"
+              title="Copy command"
+            >
+              {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+            </button>
           </div>
         </div>
 

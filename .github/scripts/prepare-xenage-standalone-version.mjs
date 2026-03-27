@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 
 const githubOutput = process.env.GITHUB_OUTPUT;
-const branch = process.env.GITHUB_REF_NAME ?? '';
+const refName = process.env.GITHUB_REF_NAME ?? '';
+const refType = process.env.GITHUB_REF_TYPE ?? (process.env.GITHUB_REF?.startsWith('refs/tags/') ? 'tag' : 'branch');
 const runNumber = process.env.GITHUB_RUN_NUMBER ?? '0';
 
 function readProjectVersion() {
@@ -26,24 +27,51 @@ function parseSemver(version) {
   };
 }
 
+function normalizeTagVersion(tagName) {
+  const normalized = tagName.replace(/^[vV]/, '');
+  parseSemver(normalized);
+  return normalized;
+}
+
+function nextPatchCiVersion(version, ciRunNumber) {
+  const parsed = parseSemver(version);
+  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}-${ciRunNumber}`;
+}
+
 const baseVersion = readProjectVersion();
-const isDev = branch === 'dev';
+
+let releaseMode = 'stable';
 let releaseVersion = baseVersion;
 let releaseTag = `xenage-standalone-v${baseVersion}`;
 let releaseName = `Xenage Standalone v${baseVersion}`;
+let prerelease = false;
 
-if (isDev) {
-  const parsed = parseSemver(baseVersion);
-  releaseVersion = `${parsed.major}.${parsed.minor}.${parsed.patch + 1}-${runNumber}`;
+if (refType === 'tag') {
+  releaseMode = 'tag';
+  releaseVersion = normalizeTagVersion(refName);
+  releaseTag = refName;
+  releaseName = `Xenage ${refName}`;
+  prerelease = false;
+} else if (refName === 'dev') {
+  releaseMode = 'dev';
+  releaseVersion = nextPatchCiVersion(baseVersion, runNumber);
   releaseTag = 'xenage-standalone-dev';
   releaseName = 'Xenage Standalone Development';
+  prerelease = true;
+} else if (refName === 'main') {
+  releaseMode = 'nightly';
+  releaseVersion = nextPatchCiVersion(baseVersion, runNumber);
+  releaseTag = 'nightly';
+  releaseName = 'Xenage Nightly';
+  prerelease = true;
 }
 
 if (githubOutput) {
+  fs.appendFileSync(githubOutput, `release_mode=${releaseMode}\n`);
   fs.appendFileSync(githubOutput, `release_version=${releaseVersion}\n`);
   fs.appendFileSync(githubOutput, `release_tag=${releaseTag}\n`);
   fs.appendFileSync(githubOutput, `release_name=${releaseName}\n`);
-  fs.appendFileSync(githubOutput, `is_dev=${isDev ? 'true' : 'false'}\n`);
+  fs.appendFileSync(githubOutput, `release_prerelease=${prerelease ? 'true' : 'false'}\n`);
 }
 
-console.log(`Prepared standalone version ${releaseVersion} for branch ${branch || 'unknown'}.`);
+console.log(`Prepared standalone version ${releaseVersion} for ${refType}:${refName || 'unknown'}.`);

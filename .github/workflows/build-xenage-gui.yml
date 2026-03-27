@@ -3,6 +3,7 @@ name: Build Xenage GUI
 on:
   push:
     branches: ["main", "dev"]
+    tags: ["*"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -91,6 +92,14 @@ jobs:
         run: yarn install
         working-directory: apps/xenage-gui
 
+      - name: prepare release version
+        id: build_release_meta
+        run: node .github/scripts/prepare-xenage-gui-version.mjs
+        env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
       - name: validate updater configuration
         shell: bash
         run: |
@@ -173,19 +182,39 @@ jobs:
         id: release_meta
         run: node .github/scripts/prepare-xenage-gui-version.mjs
         env:
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+      - name: verify tagged release points to main
+        if: steps.release_meta.outputs.release_mode == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"
+
+      - name: generate release notes
+        if: steps.release_meta.outputs.release_mode != 'dev'
+        env:
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
+          RELEASE_NAME: ${{ steps.release_meta.outputs.release_name }}
+          RELEASE_MODE: ${{ steps.release_meta.outputs.release_mode }}
+          RELEASE_NOTES_PATH: /tmp/release-notes.md
+        run: node .github/scripts/generate-xenage-release-notes.mjs
 
       - name: ensure release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          RELEASE_MODE: ${{ steps.release_meta.outputs.release_mode }}
+          RELEASE_PRERELEASE: ${{ steps.release_meta.outputs.release_prerelease }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
           RELEASE_NAME: ${{ steps.release_meta.outputs.release_name }}
-          RELEASE_BODY: Automated release from GitHub Actions
         shell: bash
         run: |
-          if [ "${GITHUB_REF}" = "refs/heads/dev" ]; then
+          if [ "${RELEASE_MODE}" = "dev" ]; then
             if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
               gh release delete "${RELEASE_TAG}" --repo "${REPO}" --yes --cleanup-tag
             fi
@@ -193,17 +222,26 @@ jobs:
               --repo "${REPO}" \
               --target "${GITHUB_SHA}" \
               --title "${RELEASE_NAME}" \
-              --notes "${RELEASE_BODY}" \
+              --notes "Automated development release from GitHub Actions" \
               --prerelease
           else
             if gh release view "${RELEASE_TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-              gh release edit "${RELEASE_TAG}" --repo "${REPO}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}"
-            else
-              gh release create "${RELEASE_TAG}" \
+              gh release edit "${RELEASE_TAG}" \
                 --repo "${REPO}" \
-                --target "${GITHUB_SHA}" \
                 --title "${RELEASE_NAME}" \
-                --notes "${RELEASE_BODY}"
+                --notes-file /tmp/release-notes.md
+            else
+              create_args=(
+                "${RELEASE_TAG}"
+                --repo "${REPO}"
+                --target "${GITHUB_SHA}"
+                --title "${RELEASE_NAME}"
+                --notes-file /tmp/release-notes.md
+              )
+              if [ "${RELEASE_PRERELEASE}" = "true" ]; then
+                create_args+=(--prerelease)
+              fi
+              gh release create "${create_args[@]}"
             fi
           fi
 

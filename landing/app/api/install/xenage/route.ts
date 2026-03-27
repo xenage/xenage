@@ -1,13 +1,16 @@
+import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-const MANIFEST_URLS = [
-  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
-  "https://github.com/xenage/xenage/releases/download/xenage-standalone-main/latest.json",
-] as const;
+type Channel = "latest" | "development";
 
-const SUPPORTED_TARGETS = new Set([
+const INSTALLER_USER_AGENT = "xenage-landing-installer";
+const CACHE_ROOT = process.env.XENAGE_INSTALL_CACHE_DIR ?? join(tmpdir(), "xenage-install-cache");
+
+const TARGETS = new Set([
   "linux-x86_64",
   "linux-aarch64",
   "darwin-x86_64",
@@ -16,13 +19,61 @@ const SUPPORTED_TARGETS = new Set([
   "windows-aarch64",
 ]);
 
+const LATEST_MANIFESTS = [
+  "https://github.com/xenage/xenage/releases/download/xenage-standalone-main/latest.json",
+  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+] as const;
+
+const DEVELOPMENT_MANIFESTS = [
+  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+] as const;
+
 type ManifestPlatform = {
   url?: string;
 };
 
 type StandaloneManifest = {
+  version?: string;
   platforms?: Record<string, ManifestPlatform>;
 };
+
+type CacheEntry = {
+  version: string;
+  assetUrl: string;
+  filePath: string;
+  contentType: string;
+  contentLength: string;
+  channel: Channel;
+  target: string;
+};
+
+function parseChannel(raw: string | null): Channel {
+  if (raw === "latest") {
+    return "latest";
+  }
+  if (raw === "development") {
+    return "development";
+  }
+  return "development";
+}
+
+function supportedManifestUrls(channel: Channel): readonly string[] {
+  if (channel === "latest") {
+    return LATEST_MANIFESTS;
+  }
+  return DEVELOPMENT_MANIFESTS;
+}
+
+function cacheMetaPath(channel: Channel, target: string): string {
+  return join(CACHE_ROOT, `${channel}-${target}.json`);
+}
+
+function defaultBinaryName(target: string): string {
+  if (target.startsWith("windows-")) {
+    return "xenage.exe";
+  }
+  return "xenage";
+}
 
 function fallbackTargets(target: string): string[] {
   if (target === "darwin-aarch64") {
@@ -34,31 +85,39 @@ function fallbackTargets(target: string): string[] {
   return [target];
 }
 
-function sanitizeUrl(url: string): string {
+function sanitizeAssetUrl(url: string): string {
   return url.replace(/ /g, "%20");
 }
 
-async function fetchManifest(): Promise<StandaloneManifest> {
-  for (const manifestUrl of MANIFEST_URLS) {
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchManifest(channel: Channel): Promise<StandaloneManifest> {
+  const urls = supportedManifestUrls(channel);
+  for (const manifestUrl of urls) {
     const response = await fetch(manifestUrl, {
       cache: "no-store",
-      headers: {
-        "user-agent": "xenage-landing-installer",
-      },
+      headers: { "user-agent": INSTALLER_USER_AGENT },
     });
     if (!response.ok) {
       continue;
     }
-    const payload = (await response.json()) as StandaloneManifest;
-    return payload;
+    return (await response.json()) as StandaloneManifest;
   }
-  throw new Error("Standalone release manifest was not found");
+
+  throw new Error(`Standalone ${channel} manifest was not found`);
 }
 
 function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
   const platforms = manifest.platforms;
   if (!platforms) {
-    throw new Error("Standalone manifest has no platforms field");
+    throw new Error("Standalone manifest has no platforms");
   }
 
   for (const candidate of fallbackTargets(target)) {
@@ -66,53 +125,111 @@ function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
     if (!entry || typeof entry.url !== "string" || entry.url.length === 0) {
       continue;
     }
-    return sanitizeUrl(entry.url);
+    return sanitizeAssetUrl(entry.url);
   }
 
   throw new Error(`No standalone asset found for target ${target}`);
 }
 
-function responseFilename(target: string): string {
-  if (target.startsWith("windows-")) {
-    return "xenage.exe";
+async function readCache(path: string): Promise<CacheEntry | null> {
+  try {
+    const raw = await readFile(path, "utf-8");
+    return JSON.parse(raw) as CacheEntry;
+  } catch {
+    return null;
   }
-  return "xenage";
+}
+
+async function writeCache(path: string, entry: CacheEntry): Promise<void> {
+  await writeFile(path, JSON.stringify(entry), "utf-8");
+}
+
+async function downloadToCache(channel: Channel, target: string, version: string, assetUrl: string): Promise<CacheEntry> {
+  await mkdir(CACHE_ROOT, { recursive: true });
+
+  const response = await fetch(assetUrl, {
+    cache: "no-store",
+    headers: { "user-agent": INSTALLER_USER_AGENT },
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Failed to download standalone binary from ${assetUrl}`);
+  }
+
+  const fileName = `${channel}-${target}-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`;
+  const tempPath = join(CACHE_ROOT, `${fileName}.tmp`);
+  const finalPath = join(CACHE_ROOT, fileName);
+
+  const binary = Buffer.from(await response.arrayBuffer());
+  await writeFile(tempPath, binary);
+  await rename(tempPath, finalPath);
+
+  return {
+    version,
+    assetUrl,
+    filePath: finalPath,
+    contentType: response.headers.get("content-type") ?? "application/octet-stream",
+    contentLength: response.headers.get("content-length") ?? "",
+    channel,
+    target,
+  };
+}
+
+function responseHeaders(target: string, entry: CacheEntry): Headers {
+  const headers = new Headers();
+  headers.set("content-type", entry.contentType || "application/octet-stream");
+  headers.set("content-disposition", `attachment; filename=\"${defaultBinaryName(target)}\"`);
+  headers.set("cache-control", "no-store");
+  if (entry.contentLength.length > 0) {
+    headers.set("content-length", entry.contentLength);
+  }
+  headers.set("x-xenage-channel", entry.channel);
+  headers.set("x-xenage-version", entry.version);
+  return headers;
+}
+
+async function resolveCacheEntry(channel: Channel, target: string): Promise<CacheEntry> {
+  const manifest = await fetchManifest(channel);
+  const version = typeof manifest.version === "string" ? manifest.version : "unknown";
+  const assetUrl = resolveAssetUrl(manifest, target);
+  const metaPath = cacheMetaPath(channel, target);
+
+  if (channel === "latest") {
+    const cached = await readCache(metaPath);
+    if (
+      cached &&
+      cached.version === version &&
+      cached.assetUrl === assetUrl &&
+      (await fileExists(cached.filePath))
+    ) {
+      return cached;
+    }
+  }
+
+  const fresh = await downloadToCache(channel, target, version, assetUrl);
+  await writeCache(metaPath, fresh);
+  return fresh;
 }
 
 export async function GET(request: NextRequest): Promise<Response> {
   const target = request.nextUrl.searchParams.get("target") ?? "";
-  if (!SUPPORTED_TARGETS.has(target)) {
+  const channel = parseChannel(request.nextUrl.searchParams.get("channel"));
+
+  if (!TARGETS.has(target)) {
     return new Response("Unsupported target", { status: 400 });
   }
 
   try {
-    const manifest = await fetchManifest();
-    const assetUrl = resolveAssetUrl(manifest, target);
+    const entry = await resolveCacheEntry(channel, target);
 
-    const assetResponse = await fetch(assetUrl, {
-      cache: "no-store",
-      headers: {
-        "user-agent": "xenage-landing-installer",
-      },
-    });
-
-    if (!assetResponse.ok || !assetResponse.body) {
-      return new Response("Failed to download standalone asset", { status: 502 });
+    if (!(await fileExists(entry.filePath))) {
+      return new Response("Cached file is missing", { status: 500 });
     }
 
-    const headers = new Headers();
-    headers.set("content-type", "application/octet-stream");
-    headers.set("content-disposition", `attachment; filename=\"${responseFilename(target)}\"`);
-    headers.set("cache-control", "no-store");
-
-    const contentLength = assetResponse.headers.get("content-length");
-    if (contentLength) {
-      headers.set("content-length", contentLength);
-    }
-
-    return new Response(assetResponse.body, {
+    const payload = await readFile(entry.filePath);
+    return new Response(payload, {
       status: 200,
-      headers,
+      headers: responseHeaders(target, entry),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected backend error";
