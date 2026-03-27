@@ -92,6 +92,14 @@ jobs:
         run: yarn install
         working-directory: apps/xenage-gui
 
+      - name: provide .venv python shim for build scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .venv/bin
+          ln -sf "$(command -v python)" .venv/bin/python
+          .venv/bin/python --version
+
       - name: prepare release version
         id: build_release_meta
         run: node .github/scripts/prepare-xenage-gui-version.mjs
