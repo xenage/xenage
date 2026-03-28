@@ -29,6 +29,17 @@ function parseSemver(version) {
 
 function normalizeTagVersion(tagName) {
   const normalized = tagName.replace(/^[vV]/, '');
+  const fourPartMatch = normalized.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (fourPartMatch) {
+    const revision = Number.parseInt(fourPartMatch[4], 10);
+    if (revision !== 0) {
+      throw new Error(
+        `Unsupported 4-part tag version ${normalized}. Only *.0 is allowed; use a semver tag like v${fourPartMatch[1]}.${fourPartMatch[2]}.${fourPartMatch[3]}.`,
+      );
+    }
+    return `${fourPartMatch[1]}.${fourPartMatch[2]}.${fourPartMatch[3]}`;
+  }
+
   parseSemver(normalized);
   return normalized;
 }
