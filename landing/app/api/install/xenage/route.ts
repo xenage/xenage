@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 type Channel = "latest" | "development";
+type ManifestKind = "latest_cli" | "latest";
 
 const INSTALLER_USER_AGENT = "xenage-landing-installer";
 
@@ -14,6 +15,20 @@ const TARGETS = new Set([
   "windows-x86_64",
   "windows-aarch64",
 ]);
+
+const LATEST_CLI_MANIFESTS = [
+  "https://github.com/xenage/xenage/releases/download/nightly/latest_cli.json",
+  "https://github.com/xenage/xenage/releases/latest/download/latest_cli.json",
+  "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+  "https://github.com/xenage/xenage/releases/latest/download/latest.json",
+] as const;
+
+const DEVELOPMENT_CLI_MANIFESTS = [
+  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest_cli.json",
+  "https://github.com/xenage/xenage/releases/download/nightly/latest_cli.json",
+  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+  "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+] as const;
 
 const LATEST_MANIFESTS = [
   "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
@@ -62,7 +77,20 @@ function parseChannel(raw: string | null): Channel {
   return "latest";
 }
 
-function supportedManifestUrls(channel: Channel): readonly string[] {
+function parseManifestKind(raw: string | null): ManifestKind {
+  if (raw === "latest") {
+    return "latest";
+  }
+  return "latest_cli";
+}
+
+function supportedManifestUrls(channel: Channel, manifestKind: ManifestKind): readonly string[] {
+  if (manifestKind === "latest_cli") {
+    if (channel === "latest") {
+      return LATEST_CLI_MANIFESTS;
+    }
+    return DEVELOPMENT_CLI_MANIFESTS;
+  }
   if (channel === "latest") {
     return LATEST_MANIFESTS;
   }
@@ -83,8 +111,8 @@ function sanitizeAssetUrl(url: string): string {
   return url.replace(/ /g, "%20");
 }
 
-async function fetchManifest(channel: Channel): Promise<{ manifest: StandaloneManifest; manifestUrl: string }> {
-  const urls = supportedManifestUrls(channel);
+async function fetchManifest(channel: Channel, manifestKind: ManifestKind): Promise<{ manifest: StandaloneManifest; manifestUrl: string }> {
+  const urls = supportedManifestUrls(channel, manifestKind);
   for (const manifestUrl of urls) {
     const response = await fetch(manifestUrl, {
       cache: "no-store",
@@ -98,7 +126,7 @@ async function fetchManifest(channel: Channel): Promise<{ manifest: StandaloneMa
       manifestUrl,
     };
   }
-  throw new HttpError(404, `Standalone ${channel} manifest was not found`);
+  throw new HttpError(404, `Standalone ${channel} manifest (${manifestKind}) was not found`);
 }
 
 function resolveAssetUrlFromManifest(manifest: StandaloneManifest, target: string): string | null {
@@ -193,8 +221,12 @@ async function resolveCliAssetUrlFromRelease(
   return null;
 }
 
-async function resolveDownloadUrl(channel: Channel, target: string): Promise<{ url: string; version: string }> {
-  const { manifest, manifestUrl } = await fetchManifest(channel);
+async function resolveDownloadUrl(
+  channel: Channel,
+  target: string,
+  manifestKind: ManifestKind,
+): Promise<{ url: string; version: string }> {
+  const { manifest, manifestUrl } = await fetchManifest(channel, manifestKind);
   const version = typeof manifest.version === "string" ? manifest.version : "unknown";
 
   const manifestUrlMatch = resolveAssetUrlFromManifest(manifest, target);
@@ -213,13 +245,14 @@ async function resolveDownloadUrl(channel: Channel, target: string): Promise<{ u
 export async function GET(request: NextRequest): Promise<Response> {
   const target = request.nextUrl.searchParams.get("target") ?? "";
   const channel = parseChannel(request.nextUrl.searchParams.get("channel"));
+  const manifestKind = parseManifestKind(request.nextUrl.searchParams.get("manifest"));
 
   if (!TARGETS.has(target)) {
     return new Response("Unsupported target", { status: 400 });
   }
 
   try {
-    const resolved = await resolveDownloadUrl(channel, target);
+    const resolved = await resolveDownloadUrl(channel, target, manifestKind);
     return new Response(null, {
       status: 302,
       headers: {

@@ -213,6 +213,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          RELEASE_MODE: ${{ steps.release_meta.outputs.release_mode }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
           RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
         shell: bash
@@ -235,6 +236,7 @@ jobs:
           const releaseTag = process.env.RELEASE_TAG;
           const releaseVersion = process.env.RELEASE_VERSION;
           const latestOutput = path.resolve('/tmp/latest.json');
+          const latestCliOutput = path.resolve('/tmp/latest_cli.json');
 
           const allFiles = fs.readdirSync(root)
             .map((name) => path.join(root, name))
@@ -298,7 +300,9 @@ jobs:
             throw new Error('No standalone platform/signature pairs were inferred for latest.json.');
           }
 
-          fs.writeFileSync(latestOutput, `${JSON.stringify(latest, null, 2)}\n`);
+          const payload = `${JSON.stringify(latest, null, 2)}\n`;
+          fs.writeFileSync(latestOutput, payload);
+          fs.writeFileSync(latestCliOutput, payload);
           console.log(`Generated standalone updater manifest: ${latestOutput}`);
           NODE
 
@@ -308,6 +312,19 @@ jobs:
           done
           gh release upload "${RELEASE_TAG}" "${files[@]}" --repo "${REPO}" --clobber
           gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}" --clobber
+          gh release upload "${RELEASE_TAG}" /tmp/latest_cli.json --repo "${REPO}" --clobber
+
+          if [ "${RELEASE_MODE}" = "tag" ]; then
+            if ! gh release view nightly --repo "${REPO}" >/dev/null 2>&1; then
+              gh release create nightly \
+                --repo "${REPO}" \
+                --target "${GITHUB_SHA}" \
+                --title "Xenage Nightly" \
+                --notes "Automated nightly manifest pointer release" \
+                --prerelease
+            fi
+            gh release upload nightly /tmp/latest_cli.json --repo "${REPO}" --clobber
+          fi
 
       - name: verify uploaded release assets
         env:

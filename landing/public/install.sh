@@ -5,6 +5,21 @@ ARCH=$(uname -m)
 TARGET=
 CHANNEL_RAW="${XENAGE_CHANNEL:-}"
 CHANNEL=
+ALLOW_CHANNEL_CHOICE=0
+
+for arg in "$@"
+do
+    case "${arg}" in
+        --choose|--chose)
+            ALLOW_CHANNEL_CHOICE=1
+            ;;
+        *)
+            echo "Unknown argument: ${arg}"
+            echo "Usage: sh install.sh [--choose]"
+            exit 1
+            ;;
+    esac
+done
 
 if [ "${OS}" = "Linux" ]
 then
@@ -59,13 +74,13 @@ fi
 
 if [ -z "${CHANNEL}" ]
 then
-    if [ -r /dev/tty ]
+    if [ "${ALLOW_CHANNEL_CHOICE}" = "1" ] && [ -r /dev/tty ]
     then
         echo
         echo "Choose release channel:"
         echo "  1) Main (nightly latest.json)"
         echo "  2) Development"
-        echo -n "Select [1/2] (default 1): "
+        printf "Select [1/2] (default 1): "
         read answer < /dev/tty || true
         if [ -z "${answer}" ] || [ "${answer}" = "1" ] || [ "${answer}" = "latest" ] || [ "${answer}" = "Latest" ] || [ "${answer}" = "main" ] || [ "${answer}" = "nightly" ]
         then
@@ -85,7 +100,7 @@ then
 fi
 
 BASE_URL="${XENAGE_INSTALL_BASE_URL:-https://xenage.dev}"
-URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}&channel=${CHANNEL}"
+URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}&channel=${CHANNEL}&manifest=latest_cli"
 
 xenage_download_filename_prefix="xenage"
 xenage="$xenage_download_filename_prefix"
