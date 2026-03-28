@@ -10,6 +10,7 @@ on:
 
 jobs:
   build:
+    if: github.event_name != 'push' || github.ref_name != 'dev' || !contains(github.event.head_commit.message, '[skip ci]')
     permissions:
       contents: write
       actions: write

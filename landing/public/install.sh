@@ -3,7 +3,8 @@
 OS=$(uname -s)
 ARCH=$(uname -m)
 TARGET=
-CHANNEL="${XENAGE_CHANNEL:-}"
+CHANNEL_RAW="${XENAGE_CHANNEL:-}"
+CHANNEL=
 
 if [ "${OS}" = "Linux" ]
 then
@@ -40,30 +41,46 @@ then
     exit 1
 fi
 
+if [ -n "${CHANNEL_RAW}" ]
+then
+    case "${CHANNEL_RAW}" in
+        latest|main|nightly)
+            CHANNEL="latest"
+            ;;
+        development|dev)
+            CHANNEL="development"
+            ;;
+        *)
+            echo "Unsupported channel '${CHANNEL_RAW}'. Use latest/main/nightly or development/dev."
+            exit 1
+            ;;
+    esac
+fi
+
 if [ -z "${CHANNEL}" ]
 then
     if [ -r /dev/tty ]
     then
         echo
         echo "Choose release channel:"
-        echo "  1) Latest"
+        echo "  1) Main (nightly latest.json)"
         echo "  2) Development"
-        echo -n "Select [1/2] (default 2): "
+        echo -n "Select [1/2] (default 1): "
         read answer < /dev/tty || true
-        if [ "${answer}" = "1" ] || [ "${answer}" = "latest" ] || [ "${answer}" = "Latest" ]
+        if [ -z "${answer}" ] || [ "${answer}" = "1" ] || [ "${answer}" = "latest" ] || [ "${answer}" = "Latest" ] || [ "${answer}" = "main" ] || [ "${answer}" = "nightly" ]
         then
             CHANNEL="latest"
         else
             CHANNEL="development"
         fi
     else
-        CHANNEL="development"
+        CHANNEL="latest"
     fi
 fi
 
 if [ "${CHANNEL}" != "latest" ] && [ "${CHANNEL}" != "development" ]
 then
-    echo "Unsupported channel '${CHANNEL}'. Use latest or development."
+    echo "Unsupported channel '${CHANNEL}'. Use latest/main/nightly or development/dev."
     exit 1
 fi
 

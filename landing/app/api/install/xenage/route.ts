@@ -20,12 +20,13 @@ const TARGETS = new Set([
 ]);
 
 const LATEST_MANIFESTS = [
-  "https://github.com/xenage/xenage/releases/download/xenage-standalone-main/latest.json",
-  "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+  "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+  "https://github.com/xenage/xenage/releases/latest/download/latest.json",
 ] as const;
 
 const DEVELOPMENT_MANIFESTS = [
   "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+  "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
 ] as const;
 
 type ManifestPlatform = {
