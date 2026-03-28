@@ -2,5 +2,4 @@ import { createInstallHandler } from "../_lib/resolver";
 
 export const runtime = "nodejs";
 
-// Backward-compatible route; defaults to CLI installer semantics.
 export const GET = createInstallHandler("latest_cli");

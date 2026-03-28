@@ -1,0 +1,289 @@
+import type { NextRequest } from "next/server";
+
+export type Channel = "latest" | "development";
+export type ManifestKind = "latest_cli" | "latest";
+
+const INSTALLER_USER_AGENT = "xenage-landing-installer";
+
+const TARGETS = new Set([
+  "linux-x86_64",
+  "linux-aarch64",
+  "darwin-x86_64",
+  "darwin-aarch64",
+  "windows-x86_64",
+  "windows-aarch64",
+]);
+
+const MANIFESTS: Record<ManifestKind, Record<Channel, readonly string[]>> = {
+  latest_cli: {
+    latest: [
+      "https://github.com/xenage/xenage/releases/download/nightly/latest_cli.json",
+      "https://github.com/xenage/xenage/releases/latest/download/latest_cli.json",
+      "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+      "https://github.com/xenage/xenage/releases/latest/download/latest.json",
+    ],
+    development: [
+      "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest_cli.json",
+      "https://github.com/xenage/xenage/releases/download/nightly/latest_cli.json",
+      "https://github.com/xenage/xenage/releases/download/xenage-standalone-dev/latest.json",
+      "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+    ],
+  },
+  latest: {
+    latest: [
+      "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+      "https://github.com/xenage/xenage/releases/latest/download/latest.json",
+    ],
+    development: [
+      "https://github.com/xenage/xenage/releases/download/xenage-gui-dev/latest.json",
+      "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
+    ],
+  },
+};
+
+type ManifestPlatform = {
+  url?: string;
+};
+
+type Manifest = {
+  version?: string;
+  platforms?: Record<string, ManifestPlatform>;
+};
+
+type ReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  assets?: ReleaseAsset[];
+};
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function parseChannel(raw: string | null): Channel {
+  if (raw === "development") {
+    return "development";
+  }
+  return "latest";
+}
+
+function fallbackTargets(target: string): string[] {
+  if (target === "darwin-aarch64") {
+    return [target, "darwin-x86_64"];
+  }
+  if (target === "windows-aarch64") {
+    return [target, "windows-x86_64"];
+  }
+  return [target];
+}
+
+function sanitizeAssetUrl(url: string): string {
+  return url.replace(/ /g, "%20");
+}
+
+async function fetchManifest(
+  channel: Channel,
+  manifestKind: ManifestKind,
+): Promise<{ manifest: Manifest; manifestUrl: string }> {
+  const urls = MANIFESTS[manifestKind][channel];
+  for (const manifestUrl of urls) {
+    const response = await fetch(manifestUrl, {
+      cache: "no-store",
+      headers: { "user-agent": INSTALLER_USER_AGENT },
+    });
+    if (!response.ok) {
+      continue;
+    }
+    return {
+      manifest: (await response.json()) as Manifest,
+      manifestUrl,
+    };
+  }
+  throw new HttpError(404, `Manifest not found for ${manifestKind}/${channel}`);
+}
+
+function resolveAssetUrlFromManifest(manifest: Manifest, target: string): string | null {
+  const platforms = manifest.platforms;
+  if (!platforms) {
+    return null;
+  }
+  for (const candidate of fallbackTargets(target)) {
+    const entry = platforms[candidate];
+    if (!entry || typeof entry.url !== "string" || entry.url.length === 0) {
+      continue;
+    }
+    return sanitizeAssetUrl(entry.url);
+  }
+  return null;
+}
+
+function releaseTagFromDownloadUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const downloadIndex = parts.indexOf("download");
+    if (downloadIndex >= 0 && parts.length > downloadIndex + 1) {
+      return parts[downloadIndex + 1] ?? null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function inferCliTargetFromAssetName(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.includes("xenage gui") || lower.endsWith(".sig")) {
+    return null;
+  }
+  if (lower.startsWith("win_x86_xenage_") && lower.endsWith(".exe")) {
+    return "windows-x86_64";
+  }
+  if (lower.startsWith("win_aarch_xenage_") && lower.endsWith(".exe")) {
+    return "windows-aarch64";
+  }
+  if (lower.startsWith("mac_x86_xenage_")) {
+    return "darwin-x86_64";
+  }
+  if (lower.startsWith("mac_aarch_xenage_")) {
+    return "darwin-aarch64";
+  }
+  if (lower.startsWith("linux_x86_xenage_")) {
+    return "linux-x86_64";
+  }
+  if (lower.startsWith("linux_aarch_xenage_")) {
+    return "linux-aarch64";
+  }
+  return null;
+}
+
+function inferGuiTargetFromAssetName(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".sig")) {
+    return null;
+  }
+  if (lower.endsWith(".appimage")) {
+    if (lower.includes("aarch64") || lower.includes("arm64") || lower.includes("aarch")) {
+      return "linux-aarch64";
+    }
+    return "linux-x86_64";
+  }
+  if (lower.endsWith(".app.tar.gz")) {
+    if (lower.includes("aarch64") || lower.includes("arm64") || lower.includes("aarch")) {
+      return "darwin-aarch64";
+    }
+    return "darwin-x86_64";
+  }
+  if (lower.endsWith("-setup.exe") || lower.endsWith("_en-us.msi") || lower.endsWith(".msi.zip")) {
+    if (lower.includes("arm64") || lower.includes("aarch64") || lower.includes("aarch")) {
+      return "windows-aarch64";
+    }
+    return "windows-x86_64";
+  }
+  return null;
+}
+
+function inferTargetFromAssetName(name: string, manifestKind: ManifestKind): string | null {
+  if (manifestKind === "latest_cli") {
+    return inferCliTargetFromAssetName(name);
+  }
+  return inferGuiTargetFromAssetName(name);
+}
+
+async function resolveAssetUrlFromRelease(
+  manifest: Manifest,
+  manifestUrl: string,
+  target: string,
+  manifestKind: ManifestKind,
+): Promise<string | null> {
+  const primaryTag = releaseTagFromDownloadUrl(manifestUrl);
+  const anyPlatformUrl = Object.values(manifest.platforms ?? {})
+    .map((entry) => entry.url)
+    .find((url): url is string => typeof url === "string" && url.length > 0);
+  const fallbackTag = anyPlatformUrl ? releaseTagFromDownloadUrl(anyPlatformUrl) : null;
+  const releaseTag = primaryTag ?? fallbackTag;
+
+  if (!releaseTag) {
+    return null;
+  }
+
+  const response = await fetch(
+    `https://api.github.com/repos/xenage/xenage/releases/tags/${encodeURIComponent(releaseTag)}`,
+    {
+      cache: "no-store",
+      headers: { "user-agent": INSTALLER_USER_AGENT },
+    },
+  );
+  if (!response.ok) {
+    return null;
+  }
+
+  const release = (await response.json()) as GitHubRelease;
+  const assets = release.assets ?? [];
+  for (const asset of assets) {
+    if (inferTargetFromAssetName(asset.name, manifestKind) === target) {
+      return sanitizeAssetUrl(asset.browser_download_url);
+    }
+  }
+  return null;
+}
+
+async function resolveDownloadUrl(
+  channel: Channel,
+  target: string,
+  manifestKind: ManifestKind,
+): Promise<{ url: string; version: string }> {
+  const { manifest, manifestUrl } = await fetchManifest(channel, manifestKind);
+  const version = typeof manifest.version === "string" ? manifest.version : "unknown";
+
+  const manifestUrlMatch = resolveAssetUrlFromManifest(manifest, target);
+  if (manifestUrlMatch) {
+    return { url: manifestUrlMatch, version };
+  }
+
+  const releaseUrlMatch = await resolveAssetUrlFromRelease(manifest, manifestUrl, target, manifestKind);
+  if (releaseUrlMatch) {
+    return { url: releaseUrlMatch, version };
+  }
+
+  throw new HttpError(404, `No asset found for target ${target}`);
+}
+
+export function createInstallHandler(manifestKind: ManifestKind) {
+  return async function GET(request: NextRequest): Promise<Response> {
+    const target = request.nextUrl.searchParams.get("target") ?? "";
+    const channel = parseChannel(request.nextUrl.searchParams.get("channel"));
+
+    if (!TARGETS.has(target)) {
+      return new Response("Unsupported target", { status: 400 });
+    }
+
+    try {
+      const resolved = await resolveDownloadUrl(channel, target, manifestKind);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: resolved.url,
+          "cache-control": "no-store",
+          "x-xenage-channel": channel,
+          "x-xenage-version": resolved.version,
+          "x-xenage-manifest": manifestKind,
+        },
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return new Response(error.message, { status: error.status });
+      }
+      const message = error instanceof Error ? error.message : "Unexpected backend error";
+      return new Response(message, { status: 502 });
+    }
+  };
+}

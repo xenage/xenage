@@ -175,7 +175,7 @@ export default function InstallSection() {
             marginBottom: "2rem",
           }}
         >
-          Download xenage CLI for your platform or use the quick install
+          Download Xenage GUI for your platform or use the quick CLI install
         </p>
 
         <div
@@ -243,7 +243,7 @@ export default function InstallSection() {
         >
           {platforms.map((platform) => {
             const isRecommended = platform.id === recommendedPlatform;
-            const url = `/api/install/xenage?target=${platform.target}&channel=latest`;
+            const url = `/api/install/xenage-gui?target=${platform.target}&channel=latest`;
             return (
               <a
               key={platform.id}
