@@ -1,6 +1,3 @@
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -8,7 +5,6 @@ export const runtime = "nodejs";
 type Channel = "latest" | "development";
 
 const INSTALLER_USER_AGENT = "xenage-landing-installer";
-const CACHE_ROOT = process.env.XENAGE_INSTALL_CACHE_DIR ?? join(tmpdir(), "xenage-install-cache");
 
 const TARGETS = new Set([
   "linux-x86_64",
@@ -47,16 +43,6 @@ type GitHubRelease = {
   assets?: ReleaseAsset[];
 };
 
-type CacheEntry = {
-  version: string;
-  assetUrl: string;
-  filePath: string;
-  contentType: string;
-  contentLength: string;
-  channel: Channel;
-  target: string;
-};
-
 class HttpError extends Error {
   status: number;
 
@@ -73,7 +59,7 @@ function parseChannel(raw: string | null): Channel {
   if (raw === "development") {
     return "development";
   }
-  return "development";
+  return "latest";
 }
 
 function supportedManifestUrls(channel: Channel): readonly string[] {
@@ -81,17 +67,6 @@ function supportedManifestUrls(channel: Channel): readonly string[] {
     return LATEST_MANIFESTS;
   }
   return DEVELOPMENT_MANIFESTS;
-}
-
-function cacheMetaPath(channel: Channel, target: string): string {
-  return join(CACHE_ROOT, `${channel}-${target}.json`);
-}
-
-function defaultBinaryName(target: string): string {
-  if (target.startsWith("windows-")) {
-    return "xenage.exe";
-  }
-  return "xenage";
 }
 
 function fallbackTargets(target: string): string[] {
@@ -106,15 +81,6 @@ function fallbackTargets(target: string): string[] {
 
 function sanitizeAssetUrl(url: string): string {
   return url.replace(/ /g, "%20");
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function fetchManifest(channel: Channel): Promise<{ manifest: StandaloneManifest; manifestUrl: string }> {
@@ -132,16 +98,14 @@ async function fetchManifest(channel: Channel): Promise<{ manifest: StandaloneMa
       manifestUrl,
     };
   }
-
   throw new HttpError(404, `Standalone ${channel} manifest was not found`);
 }
 
-function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
+function resolveAssetUrlFromManifest(manifest: StandaloneManifest, target: string): string | null {
   const platforms = manifest.platforms;
   if (!platforms) {
-    throw new Error("Standalone manifest has no platforms");
+    return null;
   }
-
   for (const candidate of fallbackTargets(target)) {
     const entry = platforms[candidate];
     if (!entry || typeof entry.url !== "string" || entry.url.length === 0) {
@@ -149,8 +113,7 @@ function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
     }
     return sanitizeAssetUrl(entry.url);
   }
-
-  throw new HttpError(404, `No standalone asset found in latest.json for target ${target}`);
+  return null;
 }
 
 function releaseTagFromDownloadUrl(url: string): string | null {
@@ -197,7 +160,7 @@ async function resolveCliAssetUrlFromRelease(
   manifest: StandaloneManifest,
   manifestUrl: string,
   target: string,
-): Promise<string> {
+): Promise<string | null> {
   const primaryTag = releaseTagFromDownloadUrl(manifestUrl);
   const anyPlatformUrl = Object.values(manifest.platforms ?? {})
     .map((entry) => entry.url)
@@ -206,15 +169,18 @@ async function resolveCliAssetUrlFromRelease(
   const releaseTag = primaryTag ?? fallbackTag;
 
   if (!releaseTag) {
-    throw new HttpError(404, `Could not determine release tag for fallback target ${target}`);
+    return null;
   }
 
-  const response = await fetch(`https://api.github.com/repos/xenage/xenage/releases/tags/${encodeURIComponent(releaseTag)}`, {
-    cache: "no-store",
-    headers: { "user-agent": INSTALLER_USER_AGENT },
-  });
+  const response = await fetch(
+    `https://api.github.com/repos/xenage/xenage/releases/tags/${encodeURIComponent(releaseTag)}`,
+    {
+      cache: "no-store",
+      headers: { "user-agent": INSTALLER_USER_AGENT },
+    },
+  );
   if (!response.ok) {
-    throw new HttpError(502, `Failed to fetch release metadata for tag ${releaseTag}`);
+    return null;
   }
 
   const release = (await response.json()) as GitHubRelease;
@@ -224,97 +190,24 @@ async function resolveCliAssetUrlFromRelease(
       return sanitizeAssetUrl(asset.browser_download_url);
     }
   }
-
-  throw new HttpError(404, `No CLI asset found for target ${target} in release ${releaseTag}`);
+  return null;
 }
 
-async function readCache(path: string): Promise<CacheEntry | null> {
-  try {
-    const raw = await readFile(path, "utf-8");
-    return JSON.parse(raw) as CacheEntry;
-  } catch {
-    return null;
-  }
-}
-
-async function writeCache(path: string, entry: CacheEntry): Promise<void> {
-  await writeFile(path, JSON.stringify(entry), "utf-8");
-}
-
-async function downloadToCache(channel: Channel, target: string, version: string, assetUrl: string): Promise<CacheEntry> {
-  await mkdir(CACHE_ROOT, { recursive: true });
-
-  const response = await fetch(assetUrl, {
-    cache: "no-store",
-    headers: { "user-agent": INSTALLER_USER_AGENT },
-  });
-
-  if (!response.ok || !response.body) {
-    throw new Error(`Failed to download standalone binary from ${assetUrl}`);
-  }
-
-  const fileName = `${channel}-${target}-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`;
-  const tempPath = join(CACHE_ROOT, `${fileName}.tmp`);
-  const finalPath = join(CACHE_ROOT, fileName);
-
-  const binary = Buffer.from(await response.arrayBuffer());
-  await writeFile(tempPath, binary);
-  await rename(tempPath, finalPath);
-
-  return {
-    version,
-    assetUrl,
-    filePath: finalPath,
-    contentType: response.headers.get("content-type") ?? "application/octet-stream",
-    contentLength: response.headers.get("content-length") ?? "",
-    channel,
-    target,
-  };
-}
-
-function responseHeaders(target: string, entry: CacheEntry): Headers {
-  const headers = new Headers();
-  headers.set("content-type", entry.contentType || "application/octet-stream");
-  headers.set("content-disposition", `attachment; filename=\"${defaultBinaryName(target)}\"`);
-  headers.set("cache-control", "no-store");
-  if (entry.contentLength.length > 0) {
-    headers.set("content-length", entry.contentLength);
-  }
-  headers.set("x-xenage-channel", entry.channel);
-  headers.set("x-xenage-version", entry.version);
-  return headers;
-}
-
-async function resolveCacheEntry(channel: Channel, target: string): Promise<CacheEntry> {
+async function resolveDownloadUrl(channel: Channel, target: string): Promise<{ url: string; version: string }> {
   const { manifest, manifestUrl } = await fetchManifest(channel);
   const version = typeof manifest.version === "string" ? manifest.version : "unknown";
-  let assetUrl: string;
-  try {
-    assetUrl = resolveAssetUrl(manifest, target);
-  } catch (error) {
-    if (error instanceof HttpError && error.status === 404) {
-      assetUrl = await resolveCliAssetUrlFromRelease(manifest, manifestUrl, target);
-    } else {
-      throw error;
-    }
-  }
-  const metaPath = cacheMetaPath(channel, target);
 
-  if (channel === "latest") {
-    const cached = await readCache(metaPath);
-    if (
-      cached &&
-      cached.version === version &&
-      cached.assetUrl === assetUrl &&
-      (await fileExists(cached.filePath))
-    ) {
-      return cached;
-    }
+  const manifestUrlMatch = resolveAssetUrlFromManifest(manifest, target);
+  if (manifestUrlMatch) {
+    return { url: manifestUrlMatch, version };
   }
 
-  const fresh = await downloadToCache(channel, target, version, assetUrl);
-  await writeCache(metaPath, fresh);
-  return fresh;
+  const releaseUrlMatch = await resolveCliAssetUrlFromRelease(manifest, manifestUrl, target);
+  if (releaseUrlMatch) {
+    return { url: releaseUrlMatch, version };
+  }
+
+  throw new HttpError(404, `No asset found for target ${target}`);
 }
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -326,16 +219,15 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   try {
-    const entry = await resolveCacheEntry(channel, target);
-
-    if (!(await fileExists(entry.filePath))) {
-      return new Response("Cached file is missing", { status: 500 });
-    }
-
-    const payload = await readFile(entry.filePath);
-    return new Response(payload, {
-      status: 200,
-      headers: responseHeaders(target, entry),
+    const resolved = await resolveDownloadUrl(channel, target);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: resolved.url,
+        "cache-control": "no-store",
+        "x-xenage-channel": channel,
+        "x-xenage-version": resolved.version,
+      },
     });
   } catch (error) {
     if (error instanceof HttpError) {
