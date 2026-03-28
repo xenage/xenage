@@ -38,6 +38,15 @@ type StandaloneManifest = {
   platforms?: Record<string, ManifestPlatform>;
 };
 
+type ReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  assets?: ReleaseAsset[];
+};
+
 type CacheEntry = {
   version: string;
   assetUrl: string;
@@ -47,6 +56,15 @@ type CacheEntry = {
   channel: Channel;
   target: string;
 };
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 function parseChannel(raw: string | null): Channel {
   if (raw === "latest") {
@@ -99,7 +117,7 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function fetchManifest(channel: Channel): Promise<StandaloneManifest> {
+async function fetchManifest(channel: Channel): Promise<{ manifest: StandaloneManifest; manifestUrl: string }> {
   const urls = supportedManifestUrls(channel);
   for (const manifestUrl of urls) {
     const response = await fetch(manifestUrl, {
@@ -109,10 +127,13 @@ async function fetchManifest(channel: Channel): Promise<StandaloneManifest> {
     if (!response.ok) {
       continue;
     }
-    return (await response.json()) as StandaloneManifest;
+    return {
+      manifest: (await response.json()) as StandaloneManifest,
+      manifestUrl,
+    };
   }
 
-  throw new Error(`Standalone ${channel} manifest was not found`);
+  throw new HttpError(404, `Standalone ${channel} manifest was not found`);
 }
 
 function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
@@ -129,7 +150,82 @@ function resolveAssetUrl(manifest: StandaloneManifest, target: string): string {
     return sanitizeAssetUrl(entry.url);
   }
 
-  throw new Error(`No standalone asset found for target ${target}`);
+  throw new HttpError(404, `No standalone asset found in latest.json for target ${target}`);
+}
+
+function releaseTagFromDownloadUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const downloadIndex = parts.indexOf("download");
+    if (downloadIndex >= 0 && parts.length > downloadIndex + 1) {
+      return parts[downloadIndex + 1] ?? null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function inferCliTargetFromAssetName(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.includes("xenage gui") || lower.endsWith(".sig")) {
+    return null;
+  }
+  if (lower.startsWith("win_x86_xenage_") && lower.endsWith(".exe")) {
+    return "windows-x86_64";
+  }
+  if (lower.startsWith("win_aarch_xenage_") && lower.endsWith(".exe")) {
+    return "windows-aarch64";
+  }
+  if (lower.startsWith("mac_x86_xenage_")) {
+    return "darwin-x86_64";
+  }
+  if (lower.startsWith("mac_aarch_xenage_")) {
+    return "darwin-aarch64";
+  }
+  if (lower.startsWith("linux_x86_xenage_")) {
+    return "linux-x86_64";
+  }
+  if (lower.startsWith("linux_aarch_xenage_")) {
+    return "linux-aarch64";
+  }
+  return null;
+}
+
+async function resolveCliAssetUrlFromRelease(
+  manifest: StandaloneManifest,
+  manifestUrl: string,
+  target: string,
+): Promise<string> {
+  const primaryTag = releaseTagFromDownloadUrl(manifestUrl);
+  const anyPlatformUrl = Object.values(manifest.platforms ?? {})
+    .map((entry) => entry.url)
+    .find((url): url is string => typeof url === "string" && url.length > 0);
+  const fallbackTag = anyPlatformUrl ? releaseTagFromDownloadUrl(anyPlatformUrl) : null;
+  const releaseTag = primaryTag ?? fallbackTag;
+
+  if (!releaseTag) {
+    throw new HttpError(404, `Could not determine release tag for fallback target ${target}`);
+  }
+
+  const response = await fetch(`https://api.github.com/repos/xenage/xenage/releases/tags/${encodeURIComponent(releaseTag)}`, {
+    cache: "no-store",
+    headers: { "user-agent": INSTALLER_USER_AGENT },
+  });
+  if (!response.ok) {
+    throw new HttpError(502, `Failed to fetch release metadata for tag ${releaseTag}`);
+  }
+
+  const release = (await response.json()) as GitHubRelease;
+  const assets = release.assets ?? [];
+  for (const asset of assets) {
+    if (inferCliTargetFromAssetName(asset.name) === target) {
+      return sanitizeAssetUrl(asset.browser_download_url);
+    }
+  }
+
+  throw new HttpError(404, `No CLI asset found for target ${target} in release ${releaseTag}`);
 }
 
 async function readCache(path: string): Promise<CacheEntry | null> {
@@ -190,9 +286,18 @@ function responseHeaders(target: string, entry: CacheEntry): Headers {
 }
 
 async function resolveCacheEntry(channel: Channel, target: string): Promise<CacheEntry> {
-  const manifest = await fetchManifest(channel);
+  const { manifest, manifestUrl } = await fetchManifest(channel);
   const version = typeof manifest.version === "string" ? manifest.version : "unknown";
-  const assetUrl = resolveAssetUrl(manifest, target);
+  let assetUrl: string;
+  try {
+    assetUrl = resolveAssetUrl(manifest, target);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+      assetUrl = await resolveCliAssetUrlFromRelease(manifest, manifestUrl, target);
+    } else {
+      throw error;
+    }
+  }
   const metaPath = cacheMetaPath(channel, target);
 
   if (channel === "latest") {
@@ -233,6 +338,9 @@ export async function GET(request: NextRequest): Promise<Response> {
       headers: responseHeaders(target, entry),
     });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return new Response(error.message, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : "Unexpected backend error";
     return new Response(message, { status: 502 });
   }
