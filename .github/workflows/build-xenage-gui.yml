@@ -287,6 +287,7 @@ jobs:
           const releaseTag = process.env.RELEASE_TAG;
           const latestOutput = path.resolve('/tmp/latest.json');
           const updaterListOutput = path.resolve('/tmp/updater-assets.txt');
+          const updaterNameMapOutput = path.resolve('/tmp/updater-asset-name-map.txt');
           const skippedLatestOutput = path.resolve('/tmp/skipped-latest-source-files.txt');
           const cwd = process.cwd();
 
@@ -317,6 +318,11 @@ jobs:
           }
 
           const latestFiles = allFiles.filter((file) => path.basename(file) === 'latest.json');
+          function normalizeReleaseAssetName(fileName) {
+            // GitHub release upload may rewrite spaces in asset names; normalize eagerly
+            // so URLs inside latest.json always match uploaded asset names.
+            return fileName.replace(/ /g, '.');
+          }
           function inferGuiTargetFromAssetName(assetName) {
             const lower = assetName.toLowerCase();
             if (lower.endsWith('.msi.zip')) {
@@ -341,6 +347,7 @@ jobs:
           }
 
           const updaterAssetPaths = new Set();
+          const updaterAssetNames = new Map();
           const merged = latestFiles.length > 0
             ? (() => {
                 const firstManifest = JSON.parse(fs.readFileSync(latestFiles[0], 'utf8'));
@@ -368,8 +375,10 @@ jobs:
                     }
 
                     const fileName = path.basename(preferred);
-                    const encodedFileName = encodeURIComponent(fileName);
+                    const releaseAssetName = normalizeReleaseAssetName(fileName);
+                    const encodedFileName = encodeURIComponent(releaseAssetName);
                     updaterAssetPaths.add(preferred);
+                    updaterAssetNames.set(preferred, releaseAssetName);
 
                     payload.platforms[target] = {
                       ...targetPayload,
@@ -415,9 +424,11 @@ jobs:
                   }
 
                   updaterAssetPaths.add(assetPath);
+                  const releaseAssetName = normalizeReleaseAssetName(fileName);
+                  updaterAssetNames.set(assetPath, releaseAssetName);
                   payload.platforms[target] = {
                     signature,
-                    url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
+                    url: `https://github.com/${repo}/releases/download/${releaseTag}/${encodeURIComponent(releaseAssetName)}`,
                   };
                 }
 
@@ -439,6 +450,10 @@ jobs:
             `${[...updaterAssetPaths].map(toRepoRelative).sort().join('\n')}\n`,
           );
           fs.writeFileSync(
+            updaterNameMapOutput,
+            `${[...updaterAssetNames.entries()].map(([source, name]) => `${toRepoRelative(source)}\t${name}`).sort().join('\n')}\n`,
+          );
+          fs.writeFileSync(
             skippedLatestOutput,
             `${latestFiles.map(toRepoRelative).sort().join('\n')}\n`,
           );
@@ -457,6 +472,15 @@ jobs:
             done < /tmp/updater-assets.txt
           fi
 
+          declare -A updater_asset_upload_names
+          if [ -f /tmp/updater-asset-name-map.txt ]; then
+            while IFS=$'\t' read -r source upload_name; do
+              [ -n "${source}" ] || continue
+              [ -n "${upload_name}" ] || continue
+              updater_asset_upload_names["${source}"]="${upload_name}"
+            done < /tmp/updater-asset-name-map.txt
+          fi
+
           declare -A skip_latest
           if [ -f /tmp/skipped-latest-source-files.txt ]; then
             while IFS= read -r line; do
@@ -471,8 +495,8 @@ jobs:
             fi
 
             if [ -n "${updater_assets["${file}"]+x}" ]; then
-              base="$(basename "${file}")"
-              upload_path="/tmp/${base}"
+              upload_name="${updater_asset_upload_names["${file}"]:-$(basename "${file}")}"
+              upload_path="/tmp/${upload_name}"
               cp "${file}" "${upload_path}"
               gh release upload "${RELEASE_TAG}" "${upload_path}" --repo "${REPO}" --clobber
               continue
