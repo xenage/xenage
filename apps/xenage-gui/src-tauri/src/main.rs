@@ -19,7 +19,7 @@ use cluster_connection::{ClusterUiPrefsEntry, StoredClusterConnection};
 use rbac_connection::RbacYamlResourceEntry;
 
 const STABLE_UPDATE_ENDPOINT: &str =
-    "https://github.com/xenage/xenage/releases/latest/download/latest.json";
+    "https://github.com/xenage/xenage/releases/download/nightly/latest.json";
 const DEV_UPDATE_ENDPOINT: &str =
     "https://github.com/xenage/xenage/releases/download/xenage-gui-dev/latest.json";
 const STANDALONE_STABLE_BASE: &str =

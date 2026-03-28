@@ -263,6 +263,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          RELEASE_MODE: ${{ steps.release_meta.outputs.release_mode }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.release_tag }}
           RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
         shell: bash
@@ -506,6 +507,18 @@ jobs:
 
           if [ -f /tmp/latest.json ]; then
             gh release upload "${RELEASE_TAG}" /tmp/latest.json --repo "${REPO}" --clobber
+
+            if [ "${RELEASE_MODE}" = "tag" ]; then
+              if ! gh release view nightly --repo "${REPO}" >/dev/null 2>&1; then
+                gh release create nightly \
+                  --repo "${REPO}" \
+                  --target "${GITHUB_SHA}" \
+                  --title "Xenage Nightly" \
+                  --notes "Automated nightly manifest pointer release" \
+                  --prerelease
+              fi
+              gh release upload nightly /tmp/latest.json --repo "${REPO}" --clobber
+            fi
           else
             echo "Skipping /tmp/latest.json upload because no updater manifest was produced."
           fi
