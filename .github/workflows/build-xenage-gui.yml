@@ -288,6 +288,11 @@ jobs:
           const latestOutput = path.resolve('/tmp/latest.json');
           const updaterListOutput = path.resolve('/tmp/updater-assets.txt');
           const skippedLatestOutput = path.resolve('/tmp/skipped-latest-source-files.txt');
+          const cwd = process.cwd();
+
+          function toRepoRelative(filePath) {
+            return path.relative(cwd, filePath).split(path.sep).join('/');
+          }
 
           const allFiles = [];
           function walk(dir) {
@@ -436,8 +441,14 @@ jobs:
           }
 
           fs.writeFileSync(latestOutput, `${JSON.stringify(merged, null, 2)}\n`);
-          fs.writeFileSync(updaterListOutput, `${[...updaterAssetPaths].sort().join('\n')}\n`);
-          fs.writeFileSync(skippedLatestOutput, `${latestFiles.sort().join('\n')}\n`);
+          fs.writeFileSync(
+            updaterListOutput,
+            `${[...updaterAssetPaths].map(toRepoRelative).sort().join('\n')}\n`,
+          );
+          fs.writeFileSync(
+            skippedLatestOutput,
+            `${latestFiles.map(toRepoRelative).sort().join('\n')}\n`,
+          );
           if (latestFiles.length > 0) {
             console.log(`Merged ${latestFiles.length} updater manifests into ${latestOutput}.`);
           } else {
