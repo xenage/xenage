@@ -100,7 +100,7 @@ then
 fi
 
 BASE_URL="${XENAGE_INSTALL_BASE_URL:-https://xenage.dev}"
-URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}&channel=${CHANNEL}"
+URL="${BASE_URL%/}/api/install/xenage?target=${TARGET}&channel=${CHANNEL}&manifest=latest_cli"
 
 xenage_download_filename_prefix="xenage"
 xenage="$xenage_download_filename_prefix"

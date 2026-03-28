@@ -354,33 +354,26 @@ jobs:
                 for (const manifestPath of latestFiles) {
                   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
                   const platforms = manifest.platforms ?? {};
+                  const manifestDir = path.dirname(manifestPath);
+                  const manifestFiles = allFiles.filter((candidate) => candidate.startsWith(manifestDir));
 
                   for (const [target, targetPayload] of Object.entries(platforms)) {
-                    const rawUrl = targetPayload && typeof targetPayload.url === 'string' ? targetPayload.url : '';
-                    if (!rawUrl) {
-                      throw new Error(`Missing updater URL for target ${target} in ${manifestPath}`);
+                    const targetCandidates = manifestFiles
+                      .filter((candidate) => !candidate.endsWith('.sig'))
+                      .filter((candidate) => inferGuiTargetFromAssetName(path.basename(candidate)) === target)
+                      .sort();
+                    const preferred = targetCandidates[0];
+                    if (!preferred) {
+                      throw new Error(`No updater payload file was inferred for target ${target} in ${manifestPath}`);
                     }
 
-                    let fileName;
-                    try {
-                      fileName = path.basename(new URL(rawUrl).pathname);
-                    } catch (_) {
-                      fileName = path.basename(rawUrl);
-                    }
-
-                    const candidates = byBase.get(fileName) || [];
-                    if (candidates.length === 0) {
-                      throw new Error(`Updater payload ${fileName} referenced by ${manifestPath} was not found.`);
-                    }
-
-                    const manifestDir = path.dirname(manifestPath);
-                    const preferred = candidates.find((candidate) => candidate.startsWith(manifestDir))
-                      || candidates[0];
+                    const fileName = path.basename(preferred);
+                    const encodedFileName = encodeURIComponent(fileName);
                     updaterAssetPaths.add(preferred);
 
                     payload.platforms[target] = {
                       ...targetPayload,
-                      url: `https://github.com/${repo}/releases/download/${releaseTag}/${fileName}`,
+                      url: `https://github.com/${repo}/releases/download/${releaseTag}/${encodedFileName}`,
                     };
                   }
                 }
