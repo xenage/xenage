@@ -12,14 +12,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-type ManifestPlatform = {
-  url?: string;
-};
-
-type ReleaseManifest = {
-  platforms?: Record<string, ManifestPlatform>;
-};
-
 const platforms = [
   {
     id: "win-x64",
@@ -59,51 +51,12 @@ const platforms = [
   },
 ];
 
-const MANIFEST_URLS = [
-  "https://github.com/xenage/xenage/releases/download/nightly/latest.json",
-  "https://github.com/xenage/xenage/releases/latest/download/latest.json",
-];
-
-function fallbackTargets(target: string): string[] {
-  if (target === "darwin-aarch64") {
-    return [target, "darwin-x86_64"];
-  }
-  if (target === "windows-aarch64") {
-    return [target, "windows-x86_64"];
-  }
-  return [target];
-}
-
-function sanitizeUrl(url: string): string {
-  return url.replace(/ /g, "%20");
-}
-
-function resolvePlatformUrl(
-  manifest: ReleaseManifest,
-  target: string,
-): string | null {
-  const manifestPlatforms = manifest.platforms;
-  if (!manifestPlatforms) {
-    return null;
-  }
-
-  for (const candidate of fallbackTargets(target)) {
-    const entry = manifestPlatforms[candidate];
-    if (!entry || typeof entry.url !== "string" || entry.url.length === 0) {
-      continue;
-    }
-    return sanitizeUrl(entry.url);
-  }
-  return null;
-}
-
 export default function InstallSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const [recommendedPlatform, setRecommendedPlatform] = useState<string | null>(
     null,
   );
   const [copied, setCopied] = useState(false);
-  const [platformUrls, setPlatformUrls] = useState<Record<string, string | null>>({});
 
   const copyInstall = async () => {
     await navigator.clipboard.writeText("curl https://xenage.dev | sh");
@@ -160,45 +113,6 @@ export default function InstallSection() {
       return;
     }
     setRecommendedPlatform(null);
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadManifest = async () => {
-      for (const url of MANIFEST_URLS) {
-        try {
-          const response = await fetch(url, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          if (!response.ok) {
-            continue;
-          }
-          const manifest = (await response.json()) as ReleaseManifest;
-          const nextUrls: Record<string, string | null> = {};
-          for (const platform of platforms) {
-            nextUrls[platform.id] = resolvePlatformUrl(manifest, platform.target);
-          }
-          setPlatformUrls(nextUrls);
-          return;
-        } catch (error) {
-          if (controller.signal.aborted) {
-            return;
-          }
-          console.error("Failed to load release manifest", error);
-        }
-      }
-      const emptyUrls: Record<string, string | null> = {};
-      for (const platform of platforms) {
-        emptyUrls[platform.id] = null;
-      }
-      setPlatformUrls(emptyUrls);
-    };
-
-    void loadManifest();
-
-    return () => controller.abort();
   }, []);
 
   return (
@@ -329,14 +243,12 @@ export default function InstallSection() {
         >
           {platforms.map((platform) => {
             const isRecommended = platform.id === recommendedPlatform;
-            const url = platformUrls[platform.id] ?? null;
+            const url = `/api/install/xenage?target=${platform.target}&channel=latest`;
             return (
               <a
               key={platform.id}
               className="platform-card"
-              href={url ?? undefined}
-              target={url ? "_blank" : undefined}
-              rel={url ? "noopener noreferrer" : undefined}
+              href={url}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -350,27 +262,15 @@ export default function InstallSection() {
                   ? "1px solid rgba(0, 102, 255, 0.46)"
                   : "1px solid rgba(0, 0, 0, 0.06)",
                 borderRadius: "10px",
-                cursor: url ? "pointer" : "not-allowed",
+                cursor: "pointer",
                 transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
                 textDecoration: "none",
-                opacity: url ? 1 : 0.55,
-              }}
-              onClick={(event) => {
-                if (!url) {
-                  event.preventDefault();
-                }
               }}
               onMouseEnter={(e) => {
-                if (!url) {
-                  return;
-                }
                 e.currentTarget.style.transform = "translateY(-3px)";
                 e.currentTarget.style.borderColor = "rgba(0, 102, 255, 0.3)";
               }}
               onMouseLeave={(e) => {
-                if (!url) {
-                  return;
-                }
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.borderColor = isRecommended
                   ? "rgba(0, 102, 255, 0.46)"
@@ -390,19 +290,6 @@ export default function InstallSection() {
                   {platform.name}
                 </span>
                 <Download size={14} style={{ color: "#4a4a4a" }} />
-                {!url ? (
-                  <span
-                    style={{
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "0.62rem",
-                      color: "#8a8a8a",
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Unavailable
-                  </span>
-                ) : null}
                 {isRecommended ? (
                   <span
                     style={{
