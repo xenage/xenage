@@ -162,40 +162,72 @@ path_contains_dir() {
   esac
 }
 
-append_path_block() {
+upsert_path_block() {
   rc_file="$1"
-  marker="# >>> xenage installer >>>"
-  if [ -f "${rc_file}" ] && grep -F "${marker}" "${rc_file}" >/dev/null 2>&1; then
+  marker_start="# >>> xenage installer >>>"
+  marker_end="# <<< xenage installer <<<"
+
+  if [ -f "${rc_file}" ] && grep -F "${marker_start}" "${rc_file}" >/dev/null 2>&1; then
+    tmp_file="${rc_file}.xenage.tmp.$$"
+    awk -v start="${marker_start}" -v end="${marker_end}" -v dir="${INSTALL_DIR}" '
+      BEGIN { inblock = 0; replaced = 0 }
+      $0 == start {
+        print start
+        print "export PATH=\"" dir ":$PATH\""
+        print end
+        inblock = 1
+        replaced = 1
+        next
+      }
+      inblock && $0 == end {
+        inblock = 0
+        next
+      }
+      inblock {
+        next
+      }
+      {
+        print
+      }
+      END {
+        if (!replaced) {
+          print ""
+          print start
+          print "export PATH=\"" dir ":$PATH\""
+          print end
+        }
+      }
+    ' "${rc_file}" > "${tmp_file}" && mv "${tmp_file}" "${rc_file}"
     return 0
   fi
 
   {
     echo ""
-    echo "${marker}"
+    echo "${marker_start}"
     echo "export PATH=\"${INSTALL_DIR}:\$PATH\""
-    echo "# <<< xenage installer <<<"
+    echo "${marker_end}"
   } >> "${rc_file}"
 }
 
 step "Configuring shell PATH"
+UPDATED=0
+for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.zprofile"
+do
+  if [ -f "${rc}" ]; then
+    show_cmd "upsert PATH block in ${rc}"
+    upsert_path_block "${rc}"
+    UPDATED=1
+  fi
+done
+
+if [ "${UPDATED}" = "0" ]; then
+  show_cmd "create $HOME/.profile with PATH block"
+  upsert_path_block "$HOME/.profile"
+fi
+
 if path_contains_dir "${INSTALL_DIR}"; then
   ok "PATH already contains ${INSTALL_DIR}"
 else
-  UPDATED=0
-  for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.zprofile"
-  do
-    if [ -f "${rc}" ]; then
-      show_cmd "append PATH block to ${rc}"
-      append_path_block "${rc}"
-      UPDATED=1
-    fi
-  done
-
-  if [ "${UPDATED}" = "0" ]; then
-    show_cmd "create $HOME/.profile with PATH block"
-    append_path_block "$HOME/.profile"
-  fi
-
   export PATH="${INSTALL_DIR}:$PATH"
   ok "Added ${INSTALL_DIR} to PATH (new shells will pick it up)"
 fi

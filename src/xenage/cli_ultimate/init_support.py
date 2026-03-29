@@ -122,19 +122,33 @@ class InitEnvironment:
     def extract_gui_artifact(self, archive_path: Path, install_root: Path) -> Path:
         lower_name = archive_path.name.lower()
         if lower_name.endswith(".appimage"):
-            target = install_root / "Xenage.AppImage"
+            target = install_root / "Xenage GUI.AppImage"
             shutil.copy2(archive_path, target)
             mode = os.stat(target).st_mode
             os.chmod(target, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            self._create_desktop_shortcut_if_present(target)
             return target
         if lower_name.endswith(".app.tar.gz"):
             target_dir = install_root / "macos"
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
             target_dir.mkdir(parents=True, exist_ok=True)
             with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(target_dir)
+            app_bundle = self._find_macos_app_bundle(target_dir)
+            if app_bundle is not None:
+                self._clear_macos_quarantine(app_bundle)
+                self._create_desktop_shortcut_if_present(app_bundle)
+                return app_bundle
             return target_dir
+        if lower_name.endswith(".exe"):
+            target = install_root / archive_path.name
+            shutil.copy2(archive_path, target)
+            return target
         if lower_name.endswith(".zip"):
             target_dir = install_root / "windows"
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
             target_dir.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(archive_path, "r") as archive:
                 archive.extractall(target_dir)
@@ -156,3 +170,44 @@ class InitEnvironment:
         parsed = urllib.parse.urlsplit(url)
         encoded_path = urllib.parse.quote(parsed.path)
         return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, encoded_path, parsed.query, parsed.fragment))
+
+    def _desktop_dir_if_present(self) -> Path | None:
+        desktop = Path.home() / "Desktop"
+        if desktop.is_dir():
+            return desktop
+        return None
+
+    def _create_desktop_shortcut_if_present(self, target: Path) -> Path | None:
+        desktop = self._desktop_dir_if_present()
+        if desktop is None:
+            return None
+
+        shortcut = desktop / target.name
+        try:
+            if shortcut.is_symlink() or shortcut.is_file():
+                shortcut.unlink()
+            elif shortcut.exists():
+                return None
+            shortcut.symlink_to(target)
+            return shortcut
+        except OSError:
+            return None
+
+    def _find_macos_app_bundle(self, root: Path) -> Path | None:
+        bundles = sorted(root.rglob("*.app"))
+        if not bundles:
+            return None
+        return bundles[0]
+
+    def _clear_macos_quarantine(self, app_path: Path) -> None:
+        if os.sys.platform != "darwin":
+            return
+        xattr_path = shutil.which("xattr")
+        if not xattr_path:
+            return
+        subprocess.run(
+            [xattr_path, "-r", "-d", "com.apple.quarantine", str(app_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
